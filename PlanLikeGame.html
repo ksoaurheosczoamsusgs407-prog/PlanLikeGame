@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>任务协理终端 v3.19 (Stable Fix)</title>
+    
+    <!-- 1. 加载 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac',
+                            400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d',
+                            800: '#166534', 900: '#14532d',
+                        },
+                        terminal: {
+                            900: '#0c0c0c', 800: '#1e1e1e',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'blink': 'blink 1s step-end infinite',
+                    },
+                    keyframes: {
+                        blink: {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0 },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- 2. 配置 Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom": "https://esm.sh/react-dom@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.300.0",
+            "date-fns": "https://esm.sh/date-fns@2.30.0",
+            "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom"
+        }
+    }
+    </script>
+
+    <!-- 3. 加载 Babel (锁定版本以修复兼容性问题) -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <style>
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 3px; }
+        .dark .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #52525b; }
+        
+        body { -webkit-tap-highlight-color: transparent; font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", monospace; }
+        .mobile-nav-btn:active { background-color: rgba(34, 197, 94, 0.1); }
+        
+        @media (max-width: 375px) { .focus-timer-text { font-size: 3rem !important; } }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-black transition-colors duration-300 text-gray-800 dark:text-gray-300 font-mono">
+    <div id="root"></div>
+
+    <!-- 4. 应用程序逻辑 -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useMemo, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+            CheckCircle, Trophy, Settings, LayoutDashboard, Plus, Trash2, 
+            Coins, Flame, Calendar, ShoppingBag, Activity, 
+            Sun, Moon, Laptop, RotateCw, Hourglass, Repeat, 
+            Sword, Star, Zap, Clock, AlertCircle, Backpack, Ticket, History, RotateCcw,
+            Timer, Play, Pause, Square, ChevronRight, Upload, Download, User, BarChart3, Volume2, VolumeX, X,
+            Medal, Target, Award, Sparkles, Crosshair, Crown, Cpu, Terminal, ShieldCheck, Box, Lock, TimerReset,
+            ShoppingCart, Moon as MoonIcon, Code, Database, Server, Power, Camera, Image as ImageIcon, Circle, CheckCircle2,
+            FileText, Save, BookOpen, BarChart2, HardDrive, RefreshCw, AlertTriangle
+        } from 'lucide-react';
+        import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+        // --- 默认数据 ---
+        const DEFAULT_TASKS = [
+            { id: 1, title: '机体散热 (运动30m)', value: 40, exp: 50, type: 'daily', difficulty: 'medium', isHot: true },
+            { id: 2, title: '广播协议 (投简历50家)', value: 80, exp: 100, type: 'daily', difficulty: 'hard', isHot: true },
+            { id: 3, title: '代码同步 (Gitee Push)', value: 15, exp: 20, type: 'daily', difficulty: 'easy' },
+            { id: 4, title: '情报获取 (CSDN/知乎)', value: 20, exp: 20, type: 'daily', difficulty: 'easy' },
+            { id: 10, title: '脚本解析 (Python 1.5h)', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
+            { id: 11, title: '版本控制 (Git 1.5h)', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
+            { id: 12, title: '虚拟构建 (Unity 1.5h)', value: 110, exp: 150, type: 'permanent', difficulty: 'medium' },
+            { id: 13, title: '数据库索引 (MySQL)', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
+            { id: 14, title: 'C++ 编译 (二级学习)', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
+            { id: 20, title: '防火墙攻坚 (力扣2h)', value: 200, exp: 300, type: 'limited', difficulty: 'hard', isHot: true },
+            { id: 21, title: '内核编译 (算法+博客)', value: 220, exp: 350, type: 'limited', difficulty: 'hard', isHot: true },
+            { id: 30, title: '底层重构 (C++复习)', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 3 },
+            { id: 31, title: '协议分析 (Linux复习)', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 2 },
+        ];
+
+        const DEFAULT_REWARDS = [
+            { id: 1, title: '视觉数据流输入 (动漫)', cost: 50 },
+            { id: 2, title: '开放世界模拟 (游戏)', cost: 60 },
+            { id: 3, title: '有机燃料补充 (奶茶)', cost: 30 },
+            { id: 4, title: '战术射击训练 (FPS)', cost: 110 },
+            { id: 5, title: '外设硬件升级 (键盘)', cost: 500 },
+        ];
+
+        const DEFAULT_DAILY_SPECIALS = [
+            { id: 'ds_1', title: '系统休眠 (午睡30m)', cost: 15, lastBoughtDate: '' }
+        ];
+
+        const RANKS = [
+            { min: 1, title: "[TTY] 终端接入" },
+            { min: 5, title: "[USER] 标准用户" },
+            { min: 10, title: "[BASH] 壳层交互" },
+            { min: 20, title: "[SUDO] 提权请求" },
+            { min: 30, title: "[ROOT] 超级管理" },
+            { min: 40, title: "[SYS] 系统调用" },
+            { min: 50, title: "[INIT] 初始进程" }, 
+            { min: 60, title: "[DAEMON] 守护天使" }, 
+            { min: 80, title: "[BIOS] 引导核心" }, 
+            { min: 100, title: "[KERNEL] 内核意识" } 
+        ];
+
+        const ACHIEVEMENTS = [
+            { id: 'init_commit', title: 'Initial Commit', desc: '完成第1个任务', condition: (stats) => stats.totalTasks >= 1, reward: 50, icon: Terminal },
+            { id: 'version_1', title: 'v1.0 Release', desc: '完成10个任务', condition: (stats) => stats.totalTasks >= 10, reward: 100, icon: Box },
+            { id: 'stable_build', title: 'Stable Build', desc: '完成100个任务', condition: (stats) => stats.totalTasks >= 100, reward: 500, icon: ShieldCheck },
+            { id: 'resource_leak', title: '算力溢出', desc: '累计获得500算力', condition: (stats) => stats.totalEarnings >= 500, reward: 200, icon: Database },
+            { id: 'overclock', title: '系统超频', desc: '专注时长累计1小时', condition: (stats) => stats.totalFocusMinutes >= 60, reward: 150, icon: Cpu },
+            { id: 'high_availability', title: '高可用性', desc: '连续签到7天', condition: (stats) => stats.checkInStreak >= 7, reward: 300, icon: Server },
+            { id: 'full_stack', title: '全栈工程师', desc: '完成500个任务', condition: (stats) => stats.totalTasks >= 500, reward: 1000, icon: Crown },
+            { id: 'whale_user', title: '算力巨鲸', desc: '单次消费超过200算力', condition: (stats) => stats.maxSingleExpense >= 200, reward: 100, icon: ShoppingCart },
+            { id: 'flow_state', title: '心流态', desc: '专注时长累计10小时', condition: (stats) => stats.totalFocusMinutes >= 600, reward: 500, icon: Zap },
+            { id: 'uptime_99', title: 'Uptime 99.9%', desc: '连续签到30天', condition: (stats) => stats.checkInStreak >= 30, reward: 1000, icon: Activity },
+            { id: 'cron_job', title: 'Cron 专家', desc: '在23:00后完成任务', condition: (stats) => stats.hasNightActivity, reward: 100, icon: MoonIcon },
+            { id: 'early_access', title: '早鸟测试', desc: '在7:00前完成任务', condition: (stats) => stats.hasMorningActivity, reward: 100, icon: Sun },
+        ];
+
+        // --- 音效 ---
+        const playSound = (type) => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                const now = ctx.currentTime;
+                
+                if (type === 'success') { osc.type = 'square'; osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(800, now + 0.1); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.2); osc.start(now); osc.stop(now + 0.2); } 
+                else if (type === 'redeem') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, now); osc.frequency.linearRampToValueAtTime(100, now + 0.2); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.2); osc.start(now); osc.stop(now + 0.2); } 
+                else if (type === 'levelUp') { osc.type = 'square'; osc.frequency.setValueAtTime(220, now); osc.frequency.linearRampToValueAtTime(880, now + 0.4); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.4); osc.start(now); osc.stop(now + 0.4); } 
+                else if (type === 'lottery') { osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.5); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.5); osc.start(now); osc.stop(now + 0.5); } 
+                else if (type === 'achievement') { osc.type = 'triangle'; osc.frequency.setValueAtTime(440, now); osc.frequency.setValueAtTime(554, now+0.1); osc.frequency.setValueAtTime(659, now+0.2); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.6); osc.start(now); osc.stop(now + 0.6); }
+            } catch (e) {}
+        };
+
+        // --- Utils ---
+        const formatDate = (date) => {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const formatDateTime = (isoString) => isoString ? new Date(isoString).toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '-';
+        const formatTimeOnly = (isoString) => isoString ? new Date(isoString).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) : '-';
+        const formatDuration = (s) => { const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60; return h>0?`${h}时${m}分` : `${m}分${sec}秒`; };
+        const formatTimerDisplay = (s) => { const h=Math.floor(s/3600).toString().padStart(2,'0'), m=Math.floor((s%3600)/60).toString().padStart(2,'0'), sec=(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; };
+        
+        // 修复：增强的周日期计算，处理Date对象和字符串
+        const getWeekDates = (inputDate) => { 
+            // Robustly handle inputDate: it could be a Date object or a String
+            let dateStr = inputDate;
+            if (inputDate instanceof Date) {
+                dateStr = formatDate(inputDate);
+            }
+            if (typeof dateStr !== 'string' || !dateStr) {
+                 // Fallback to today if input is invalid
+                 dateStr = formatDate(new Date());
+            }
+
+            const parts = dateStr.split('-');
+            // Force noon to avoid DST/timezone midnight shifts
+            const curr = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+            
+            const day = curr.getDay(); // 0 is Sunday
+            const daysFromMonday = day === 0 ? 6 : day - 1;
+            
+            const monday = new Date(curr);
+            monday.setDate(curr.getDate() - daysFromMonday);
+            
+            const dates = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                dates.push(formatDate(d));
+            }
+            return dates;
+        };
+        const getDatesRange = (s, e) => { const ds=[], c=new Date(s); while(c<=e){ ds.push(new Date(c)); c.setDate(c.getDate()+1); } return ds; };
+        
+        const calculateLevel = (xp) => Math.floor(xp / 1000) + 1;
+        const calculateLevelProgress = (xp) => { 
+            const lvl = calculateLevel(xp); 
+            const next = lvl + 1; 
+            const base = (lvl - 1) * 1000;
+            const target = next * 1000;
+            const prog = ((xp - base) / (target - base)) * 100; 
+            return { currentLevel: lvl, nextLevel: next, progress: prog, title: getRankTitle(lvl) }; 
+        };
+        const getRankTitle = (level) => {
+            const rank = [...RANKS].reverse().find(r => level >= r.min);
+            return rank ? rank.title : RANKS[0].title;
+        };
+
+        const getTaskTimeStatus = (task, now) => {
+            if (task.type === 'permanent') return { text: '运行中', color: 'gray', hours: 9999, progress: 100 };
+            let targetDate = new Date(now); let totalDurationMs = 24 * 60 * 60 * 1000; 
+            if (task.type === 'daily') targetDate.setHours(24, 0, 0, 0);
+            else if (task.type === 'weekly') { const day = now.getDay(); const days = day === 0 ? 1 : 8 - day; targetDate.setDate(now.getDate() + days); targetDate.setHours(0, 0, 0, 0); totalDurationMs = 7 * 24 * 3600000; }
+            else if (task.type === 'limited') { if (!task.deadline) return { text: '待定', color: 'gray', hours: 9999, progress: 100 }; targetDate = new Date(task.deadline); targetDate.setHours(23, 59, 59, 999); totalDurationMs = 7 * 24 * 3600000; }
+            const diff = targetDate - now;
+            let text = ''; if (diff <= 0) text = task.type === 'limited' ? '超时' : '重置中'; else { const d = Math.floor(diff / 86400000); const h = Math.floor((diff % 86400000) / 3600000); const m = Math.floor((diff % 3600000) / 60000); if (d > 0) text = `${d}天${h}时`; else if (h > 0) text = `${h}时${m}分`; else text = `${m}分`; }
+            const hoursRemaining = diff / 3600000; let progress = (diff / totalDurationMs) * 100; if (progress > 100) progress = 100; if (progress < 0) progress = 0; 
+            let colorClass = 'bg-brand-500'; if (hoursRemaining < 4) colorClass = 'bg-red-500'; else if (hoursRemaining < 8) colorClass = 'bg-orange-500'; else if (hoursRemaining < 12) colorClass = 'bg-yellow-400'; 
+            return { text, hours: hoursRemaining, progress, colorClass, isExpired: diff <= 0 };
+        };
+        const getDayProgress = (now) => { const s = new Date(now); s.setHours(0,0,0,0); const total = 86400; const curr = (now - s) / 1000; const p = (curr / total) * 100; const rem = total - curr; const h = Math.floor(rem / 3600); const m = Math.floor((rem % 3600) / 60); return { percent: p, h, m }; };
+
+        // --- Components ---
+
+        const JournalView = ({ dailyNotes, setDailyNotes, showNotification, activityLog, tasks }) => {
+            const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+            const [noteContent, setNoteContent] = useState('');
+
+            useEffect(() => {
+                setNoteContent(dailyNotes[selectedDate] || '');
+            }, [selectedDate, dailyNotes]);
+
+            const dayLogs = activityLog[selectedDate] || [];
+            const dailyTotalValue = dayLogs.reduce((acc, log) => acc + (log.value || 0), 0);
+            const dailyTotalDuration = dayLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
+            
+            const taskStats = {};
+            dayLogs.forEach(log => {
+                const task = tasks.find(t => t.id === log.taskId);
+                const title = log.taskId === 'checkin' ? '每日签到' : (task ? task.title : (log.taskId ? `Unknown (${log.taskId})` : 'System Op'));
+                if (!taskStats[title]) taskStats[title] = { count: 0, value: 0 };
+                taskStats[title].count += 1;
+                taskStats[title].value += log.value || 0;
+            });
+
+            const handleSave = () => {
+                setDailyNotes(prev => ({ ...prev, [selectedDate]: noteContent }));
+                showNotification('系统日志已归档。', 'success');
+            };
+
+            return (
+                <div className="max-w-6xl animate-in slide-in-from-right-4 duration-300 pb-24">
+                    <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white font-mono-cn tracking-tight">系统日志</h2>
+                            <p className="text-xs text-gray-500 font-mono-cn mt-1">> 记录运行状态、错误排查与思维碎片。</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
+                        <div className="lg:col-span-2 flex flex-col gap-4 h-full">
+                            <div className="bg-black border border-gray-800 rounded-lg p-4 flex-1 flex flex-col">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="flex items-center gap-2 text-sm text-brand-500 font-bold"><Calendar size={16} /><span>日志录入</span></div>
+                                    <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="bg-gray-900 border border-gray-700 text-white text-xs rounded px-3 py-1.5 focus:border-brand-500 outline-none font-mono-cn"/>
+                                </div>
+                                <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} placeholder="// 在此输入系统运行日志、学习笔记或每日复盘..." className="flex-1 w-full bg-gray-900/50 border border-gray-800 rounded p-4 text-sm text-gray-300 font-mono-cn outline-none focus:border-brand-900 focus:ring-1 focus:ring-brand-900 resize-none"/>
+                                <div className="mt-4 flex justify-end"><button onClick={handleSave} className="px-6 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-bold rounded flex items-center gap-2 transition-all uppercase tracking-wide"><Save size={16} /> 保存日志</button></div>
+                            </div>
+                            <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 h-64 overflow-hidden flex flex-col">
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-3"><BarChart2 size={14} /> 自动运行报告 ({selectedDate})</h3>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                                    {Object.keys(taskStats).length > 0 ? (
+                                        Object.entries(taskStats).map(([title, stat]) => (
+                                            <div key={title} className="flex justify-between items-center text-xs font-mono-cn border-b border-gray-800 pb-1 last:border-0"><span className="text-gray-300">{title}</span><div className="flex gap-3"><span className="text-gray-500">x{stat.count}</span><span className="text-brand-500">+{stat.value} CP</span></div></div>
+                                        ))
+                                    ) : <div className="text-xs text-gray-600 italic text-center py-4">当日无活动记录</div>}
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between text-xs font-bold font-mono"><span className="text-gray-400">总计产出</span><span className="text-brand-400">+{dailyTotalValue} CP</span></div>
+                                {dailyTotalDuration > 0 && (<div className="flex justify-between text-xs font-bold font-mono mt-1"><span className="text-gray-400">深潜时长</span><span className="text-blue-400">{formatDuration(dailyTotalDuration)}</span></div>)}
+                            </div>
+                        </div>
+                        <div className="h-full bg-black border border-gray-800 rounded-lg p-4 flex flex-col">
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest px-1 mb-4"><FileText size={14} /> 近期归档</div>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {Object.keys(dailyNotes).length === 0 ? <div className="text-center py-8 border border-dashed border-gray-800 rounded text-xs text-gray-600 font-mono-cn">无日志记录</div> : 
+                                    Object.entries(dailyNotes).sort((a, b) => new Date(b[0]) - new Date(a[0])).map(([date, content]) => (
+                                        <div key={date} onClick={() => setSelectedDate(date)} className={`p-3 rounded border cursor-pointer transition-all group ${date === selectedDate ? 'bg-brand-900/10 border-brand-500/50' : 'bg-black border-gray-800 hover:border-gray-600'}`}>
+                                            <div className={`text-xs font-mono mb-1 ${date === selectedDate ? 'text-brand-400' : 'text-gray-500 group-hover:text-gray-300'}`}>{date}</div>
+                                            <div className="text-xs text-gray-400 line-clamp-3 font-mono-cn whitespace-pre-wrap">{content || <span className="italic opacity-50">空内容</span>}</div>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const LotteryModal = ({ rewards, onClose, onClaim }) => {
+            const [spinning, setSpinning] = useState(true);
+            const [prize, setPrize] = useState(null);
+            
+            useEffect(() => {
+                let pool = rewards && rewards.length > 0 ? rewards : [{ id: 'fallback', title: '系统补偿包 (100算力)', cost: 100 }];
+                const weighted = pool.map(r => ({ ...r, weight: 1000 / Math.max(1, r.cost) }));
+                const totalW = weighted.reduce((a, b) => a + b.weight, 0);
+                let rand = Math.random() * totalW;
+                let selected = weighted[0];
+                for (const r of weighted) { rand -= r.weight; if (rand <= 0) { selected = r; break; } }
+                const timer = setTimeout(() => { setSpinning(false); setPrize(selected); }, 2000);
+                return () => clearTimeout(timer);
+            }, [rewards]);
+
+            return (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
+                    <div className="bg-black border border-brand-500 rounded-lg p-8 max-w-sm w-full text-center relative overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.2)] font-mono-cn">
+                        <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+                        <h3 className="text-xl font-bold text-brand-400 mb-6 uppercase tracking-widest relative z-10 border-b border-brand-900 pb-2">>> 补给箱空投检测</h3>
+                        <div className="h-40 flex items-center justify-center mb-6 relative z-10">
+                            {spinning ? <div className="text-4xl animate-bounce text-brand-500">[ 检索中... ]</div> : <div className="animate-in zoom-in duration-300"><div className="text-6xl mb-4">📦</div><div className="text-lg font-bold text-white mb-1">{prize?.title}</div><div className="text-xs text-brand-600 font-bold">估值: {prize?.cost} 算力</div></div>}
+                        </div>
+                        {spinning ? <div className="text-brand-600 text-xs animate-pulse">正在解密数据包...</div> : <button onClick={() => prize && onClaim(prize)} className="w-full py-3 bg-brand-700 hover:bg-brand-600 text-white font-bold rounded border border-brand-500 shadow-lg transition-all active:scale-95 relative z-50 cursor-pointer uppercase text-sm">>> 收入背包</button>}
+                    </div>
+                </div>
+            );
+        };
+
+        const ProfileModal = ({ unlockedAchievements, xp, onClose, avatar }) => {
+            const [activeTab, setActiveTab] = useState('medals'); 
+            const { currentLevel } = calculateLevelProgress(xp);
+
+            return (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-gray-900 rounded-lg w-full max-w-2xl shadow-2xl border border-gray-700 max-h-[85vh] flex flex-col font-mono-cn text-gray-300">
+                        <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900">
+                            <div className="flex gap-1 bg-gray-800 p-1 rounded">
+                                <button onClick={() => setActiveTab('medals')} className={`px-4 py-1.5 rounded text-xs font-bold transition-colors ${activeTab === 'medals' ? 'bg-brand-700 text-white' : 'hover:bg-gray-700'}`}>勋章</button>
+                                <button onClick={() => setActiveTab('ranks')} className={`px-4 py-1.5 rounded text-xs font-bold transition-colors ${activeTab === 'ranks' ? 'bg-brand-700 text-white' : 'hover:bg-gray-700'}`}>权限</button>
+                            </div>
+                            <button onClick={onClose}><X size={20} className="hover:text-white" /></button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4 bg-black">
+                            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-800">
+                                {avatar ? (
+                                    <img src={avatar} alt="Avatar" className="w-20 h-20 rounded border-2 border-brand-500 object-cover" />
+                                ) : (
+                                    <div className="w-20 h-20 rounded border-2 border-brand-500 bg-gray-900 flex items-center justify-center text-brand-500">
+                                        <User size={40} />
+                                    </div>
+                                )}
+                                <div>
+                                    <div className="text-xl font-bold text-white mb-1">{getRankTitle(currentLevel)}</div>
+                                    <div className="text-sm text-brand-500">Lv.{currentLevel} • {xp} 编译量</div>
+                                </div>
+                            </div>
+
+                            {activeTab === 'medals' ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {ACHIEVEMENTS.map(ach => {
+                                        const isUnlocked = unlockedAchievements.includes(ach.id);
+                                        return (
+                                            <div key={ach.id} className={`p-4 rounded border flex items-center gap-4 transition-all ${isUnlocked ? 'bg-brand-900/10 border-brand-500/50' : 'bg-gray-900 border-gray-800 opacity-50 grayscale'}`}>
+                                                <div className={`w-10 h-10 rounded flex items-center justify-center text-lg border ${isUnlocked ? 'border-brand-500 text-brand-400' : 'border-gray-700 text-gray-600'}`}>{isUnlocked ? <ach.icon size={20} /> : <Lock size={16} />}</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-center mb-1"><h4 className={`font-bold text-sm truncate ${isUnlocked ? 'text-brand-100' : 'text-gray-500'}`}>{ach.title}</h4>{isUnlocked && <span className="text-[10px] text-brand-500 border border-brand-500 px-1 rounded">已解锁</span>}</div>
+                                                    <p className="text-xs text-gray-500 truncate">{ach.desc}</p>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="space-y-4 relative pl-4">
+                                    <div className="absolute left-[27px] top-4 bottom-4 w-px bg-gray-800 z-0"></div>
+                                    {RANKS.map((rank, index) => {
+                                        const nextRankMin = RANKS[index + 1]?.min || 9999;
+                                        const isActive = currentLevel >= rank.min && currentLevel < nextRankMin;
+                                        const isUnlocked = currentLevel >= rank.min;
+                                        return (
+                                            <div key={rank.min} className={`relative z-10 flex items-center gap-4 ${isActive ? 'opacity-100' : isUnlocked ? 'opacity-70' : 'opacity-30'}`}>
+                                                <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] border ${isActive ? 'bg-brand-500 text-black border-brand-400' : isUnlocked ? 'bg-gray-800 border-gray-600 text-gray-400' : 'bg-black border-gray-800 text-gray-700'}`}>{isUnlocked ? <CheckCircle size={12}/> : <Lock size={12}/>}</div>
+                                                <div className={`flex-1 p-3 border rounded ${isActive ? 'border-brand-500 bg-brand-900/10' : 'border-gray-800 bg-gray-900'}`}>
+                                                    <div className="flex justify-between items-center">
+                                                        <div>
+                                                            <span className="text-xs text-gray-500 font-mono-cn">LV.{rank.min}+</span>
+                                                            <h4 className={`font-bold text-sm ${isActive ? 'text-brand-400' : 'text-gray-300'}`}>{rank.title}</h4>
+                                                        </div>
+                                                        {isActive && <span className="text-[10px] bg-brand-900 text-brand-300 px-2 py-1 rounded border border-brand-700 animate-pulse">当前权限</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CheckInCard = ({ checkIn, onCheckIn }) => {
+            const today = formatDate(new Date());
+            const hasCheckedIn = checkIn.lastCheckIn === today;
+            return (
+                <div className="bg-gray-900 border border-gray-700 p-6 rounded-lg shadow-sm flex flex-col justify-between relative overflow-hidden h-32 group">
+                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Calendar size={80} /></div>
+                    <div className="relative z-10">
+                        <div className="font-bold text-gray-300 text-sm flex items-center gap-2 mb-1"><Calendar size={16}/> 链路状态</div>
+                        <div className="text-xs text-gray-500 font-mono-cn">在线时长: {checkIn.streak} 天</div>
+                    </div>
+                    <button onClick={onCheckIn} disabled={hasCheckedIn} className={`relative z-10 mt-auto w-full py-2 rounded border text-xs font-bold transition-all flex items-center justify-center gap-2 ${hasCheckedIn ? 'border-green-900 text-green-700 bg-green-900/10 cursor-not-allowed' : 'border-brand-600 text-brand-400 hover:bg-brand-900/20'}`}>{hasCheckedIn ? <span><CheckCircle size={12} className="inline mr-1"/>已连接</span> : <span>建立连接 (+10 编译量)</span>}</button>
+                </div>
+            );
+        };
+
+        const TaskItem = ({ task, isCompleted, timeStatus, onClick, weeklyCount }) => {
+            const { text: timeStr, colorClass, progress, isExpired } = timeStatus;
+            const typeConfig = { daily: { color: 'brand', icon: RotateCw, label: '守护进程' }, weekly: { color: 'blue', icon: Calendar, label: '定期维护' }, limited: { color: 'amber', icon: Hourglass, label: '紧急补丁' }, permanent: { color: 'violet', icon: Repeat, label: '后台服务' } };
+            const conf = typeConfig[task.type] || typeConfig['daily']; const IconComp = conf.icon;
+            
+            const diffConfig = { easy: { color: 'text-green-500', label: '简单', mul: 1 }, medium: { color: 'text-yellow-500', label: '中等', mul: 1 }, hard: { color: 'text-red-500', label: '硬核', mul: 1 } };
+            const diff = diffConfig[task.difficulty || 'medium']; 
+
+            const borderClass = isCompleted ? `border-gray-800 opacity-50` : `border-gray-700 hover:border-brand-500`;
+            const bgClass = isCompleted ? `bg-gray-900` : `bg-gray-900`;
+
+            const requiredCount = task.requiredCount || 1;
+            const currentCount = weeklyCount || 0;
+            const isWeeklyIncomplete = task.type === 'weekly' && currentCount < requiredCount;
+
+            return (
+                <div onClick={onClick} className={`relative p-4 rounded border transition-all cursor-pointer select-none group overflow-hidden ${bgClass} ${borderClass}`}>
+                    {/* HOT 标识 */}
+                    {task.isHot && !isCompleted && !isWeeklyIncomplete && (
+                        <div className="absolute top-0 right-0 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-bl shadow-sm animate-pulse z-20">HOT</div>
+                    )}
+
+                    <div className="flex items-center gap-3 w-full">
+                         <div className={`w-8 h-8 rounded flex items-center justify-center transition-colors flex-shrink-0 border ${isCompleted ? 'border-brand-900 text-brand-900 bg-black' : 'border-gray-700 text-gray-500 bg-gray-800 group-hover:text-brand-400 group-hover:border-brand-500'}`}>
+                            {task.type === 'permanent' ? <IconComp size={16} /> : <CheckCircle size={16} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className={`font-bold text-sm truncate font-mono-cn ${isCompleted ? 'text-gray-600 line-through' : 'text-gray-300 group-hover:text-brand-100'}`}>{task.title}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-500 border border-gray-700">{conf.label}</span>
+                                <span className={`text-[10px] font-bold ${diff.color}`}>{diff.label}</span>
+                                {!isCompleted && task.type !== 'permanent' && (<span className={`text-[10px] flex items-center gap-1 ${task.type === 'limited' && isExpired ? 'text-red-500' : 'text-gray-500'}`}>{timeStr}</span>)}
+                            </div>
+                            
+                            {/* Weekly Progress Dots */}
+                            {task.type === 'weekly' && requiredCount > 1 && (
+                                <div className="flex gap-1 mt-2">
+                                    {Array.from({length: requiredCount}).map((_, idx) => (
+                                        <div key={idx} className={`w-1.5 h-1.5 rounded-full ${idx < currentCount ? 'bg-brand-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'bg-gray-700'}`}></div>
+                                    ))}
+                                    <span className="text-[9px] text-gray-500 ml-1">{currentCount}/{requiredCount}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-right">
+                             <div className={`text-sm font-bold font-mono-cn ${isCompleted ? 'text-gray-700' : 'text-brand-500'}`}>+{task.value}</div>
+                             <div className="text-[10px] text-gray-600">算力</div>
+                        </div>
+                    </div>
+                    {!isCompleted && task.type !== 'permanent' && (<div className="absolute bottom-0 left-0 h-0.5 bg-brand-900 w-full"><div className="h-full bg-brand-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div></div>)}
+                </div>
+            );
+        };
+
+        const RewardCard = ({ reward, balance, onRedeem }) => {
+            const canAfford = balance >= reward.cost;
+            return (
+                <button onClick={() => onRedeem(reward)} disabled={!canAfford} className={`flex flex-col p-4 rounded border text-left transition-all relative overflow-hidden group ${canAfford ? 'bg-gray-900 border-gray-700 hover:border-brand-500 hover:shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-black border-gray-800 opacity-50 cursor-not-allowed'}`}>
+                    <div className="flex justify-between items-start w-full mb-2"><span className="text-gray-500"><Trophy size={16} /></span><span className={`text-xs font-bold px-2 py-0.5 rounded ${canAfford ? 'bg-brand-900 text-brand-300' : 'bg-gray-800 text-gray-600'}`}>-{reward.cost}</span></div>
+                    <h4 className="font-bold text-sm text-gray-300 mb-1 line-clamp-2 font-mono-cn group-hover:text-brand-200">{reward.title}</h4>
+                    <div className="text-[10px] text-gray-600 mt-auto uppercase">{canAfford ? '>> 点击购买' : '算力不足'}</div>
+                </button>
+            );
+        };
+        
+        const DailySpecialCard = ({ dailySpecial, balance, onRedeem }) => {
+            const today = formatDate(new Date());
+            const isSoldOut = dailySpecial.lastBoughtDate === today;
+            const canAfford = balance >= dailySpecial.cost;
+
+            return (
+                <div className="rounded border border-pink-900/50 bg-pink-900/10 p-4 relative overflow-hidden flex flex-col justify-between h-full group hover:border-pink-500/50 transition-colors">
+                     <div className="absolute top-0 right-0 p-2 opacity-20 text-pink-500"><Sparkles size={40} /></div>
+                     <div className="relative z-10">
+                        <div className="flex items-center gap-2 mb-2"><TimerReset size={14} className="text-pink-400"/><span className="text-[10px] font-bold text-pink-500 uppercase tracking-widest">每日特惠</span></div>
+                        <h3 className="text-sm font-bold text-pink-100 mb-1">{dailySpecial.title || "未知物品"}</h3>
+                        <div className="text-[10px] text-pink-400/80 font-mono-cn">限购 1 次</div>
+                     </div>
+                     <button onClick={() => onRedeem(dailySpecial)} disabled={isSoldOut || !canAfford} className={`relative z-10 mt-3 w-full py-1.5 rounded border text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${isSoldOut ? 'border-gray-800 text-gray-600 cursor-not-allowed bg-black' : canAfford ? 'border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-black' : 'border-gray-800 text-gray-700 cursor-not-allowed'}`}>
+                        {isSoldOut ? '已售罄' : <>{!canAfford && <AlertCircle size={10}/>} -{dailySpecial.cost} 抢购</>}
+                     </button>
+                </div>
+            );
+        };
+
+        const InventoryItem = ({ item, onUse, onDelete }) => {
+            return (
+                <div className={`flex flex-col md:flex-row md:items-center justify-between p-3 rounded border transition-all gap-4 ${item.used ? 'bg-black border-gray-800 opacity-60' : 'bg-gray-900 border-gray-700 hover:border-brand-500/50'}`}>
+                    <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded flex items-center justify-center flex-shrink-0 border ${item.used ? 'border-gray-800 text-gray-700' : 'border-brand-900 text-brand-500 bg-brand-900/20'}`}>{item.used ? <CheckCircle size={16} /> : <Ticket size={16} />}</div><div><h4 className={`font-bold text-sm font-mono-cn ${item.used ? 'text-gray-600 line-through' : 'text-gray-300'}`}>{item.title}</h4><div className="text-[10px] text-gray-500 font-mono-cn mt-0.5">花销: {item.cost} | 获取: {formatDate(new Date(item.redeemedAt))}</div></div></div>
+                    <div className="flex items-center gap-2">{!item.used ? <button onClick={() => onUse(item.id)} className="px-3 py-1 bg-brand-700 hover:bg-brand-600 text-white rounded text-[10px] font-bold transition-colors">使用</button> : <button onClick={() => onDelete(item.id)} className="p-1.5 text-gray-600 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>}</div>
+                </div>
+            );
+        };
+
+        const DayProgressCard = ({ currentTime }) => {
+            const { percent, h, m } = getDayProgress(currentTime);
+            let progressColor = 'from-brand-900 to-brand-500'; let textColor = 'text-brand-500'; 
+            if(h<4) { progressColor='from-red-900 to-red-600'; textColor='text-red-500'; } 
+            else if(h<8) { progressColor='from-yellow-900 to-yellow-600'; textColor='text-yellow-500'; }
+            
+            return (
+                <div className="bg-black border border-gray-800 p-4 rounded mb-6 relative overflow-hidden font-mono-cn">
+                    <div className="flex justify-between items-end mb-2 relative z-10"><div><h3 className="text-gray-400 text-xs flex items-center gap-2 uppercase tracking-widest"><Clock size={14} className={textColor}/> 每日时间进度</h3><p className="text-[10px] text-gray-600 mt-1">剩余时间: {h}小时 {m}分</p></div><div className={`text-2xl font-bold ${textColor}`}>{Math.floor(percent)}%</div></div>
+                    <div className="relative w-full h-2 bg-gray-900 rounded-full overflow-hidden"><div className={`absolute top-0 left-0 h-full bg-gradient-to-r ${progressColor} transition-all duration-1000`} style={{width: `${percent}%`}}></div></div>
+                </div>
+            );
+        };
+
+        const SidebarProfile = ({ xp, avatar, onClick }) => {
+            const { currentLevel, nextLevel, progress, title } = calculateLevelProgress(xp);
+            return (
+                <div onClick={onClick} className="cursor-pointer p-4 border-b border-gray-800 hover:bg-gray-900 transition-colors group">
+                     <div className="flex items-center gap-3 mb-2">
+                        {avatar ? (
+                            <img src={avatar} alt="Avatar" className="w-10 h-10 rounded border border-gray-700 object-cover" />
+                        ) : (
+                            <div className="w-10 h-10 rounded bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 group-hover:text-brand-400 group-hover:border-brand-500 transition-colors"><User size={20} /></div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">操作员</div>
+                            <div className="text-sm font-bold text-white truncate font-mono-cn">{title}</div>
+                        </div>
+                     </div>
+                     <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden mb-1"><div className="h-full bg-brand-600 transition-all duration-500" style={{width: `${progress}%`}}></div></div>
+                     <div className="flex justify-between text-[9px] text-gray-600 font-mono-cn"><span>LV.{currentLevel}</span><span>{Math.floor(progress)}% 升级</span></div>
+                </div>
+            );
+        };
+
+        const Heatmap = ({ activityLog }) => {
+            const endDate = new Date(); const startDate = new Date(); startDate.setDate(endDate.getDate() - 364); while(startDate.getDay() !== 0) startDate.setDate(startDate.getDate() - 1);
+            const dateRange = getDatesRange(startDate, endDate);
+            const getColor = (count) => { if (count === 0) return 'bg-gray-800'; if (count <= 2) return 'bg-brand-900/60'; if (count <= 5) return 'bg-brand-800'; if (count <= 9) return 'bg-brand-600'; return 'bg-brand-400'; };
+            return (
+                <div className="bg-black border border-gray-800 p-4 rounded overflow-hidden mt-6">
+                    <div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> 活动日志</h3></div>
+                    <div className="overflow-x-auto pb-1 scrollbar-thin"><div className="flex gap-1 min-w-max">{Array.from({length: 53}).map((_, w) => <div key={w} className="flex flex-col gap-1">{Array.from({length: 7}).map((_, d) => { const i = w*7+d; if(i>=dateRange.length) return <div key={d} className="w-2.5 h-2.5"/>; const dateStr=formatDate(dateRange[i]); const c=(activityLog[dateStr]||[]).length; return <div key={dateStr} title={`${dateStr}: ${c}`} className={`w-2.5 h-2.5 rounded-[1px] transition-colors ${getColor(c)}`} /> })}</div>)}</div></div>
+                </div>
+            );
+        };
+
+        const WeeklyChart = ({ activityLog }) => {
+            const data = useMemo(() => { 
+                const todayStr = formatDate(new Date());
+                const dates = getWeekDates(todayStr); 
+                return dates.map(date => { 
+                    const logs = activityLog[date] || []; 
+                    const income = logs.reduce((acc, curr) => acc + (curr.value || 0), 0); 
+                    return { name: date.slice(5), income }; 
+                }); 
+            }, [activityLog]);
+            return (
+                <div className="bg-black border border-gray-800 p-4 rounded overflow-hidden h-64 mt-6">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-4"><BarChart3 size={14}/> 本周产出</h3>
+                    <ResponsiveContainer width="100%" height="80%"><BarChart data={data}><XAxis dataKey="name" stroke="#444" fontSize={10} tickLine={false} axisLine={false} /><Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#000', borderColor: '#333', fontSize: '12px' }} /><Bar dataKey="income" fill="#16a34a" radius={[2, 2, 0, 0]}>{data.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.income > 0 ? '#16a34a' : '#333'} />)}</Bar></BarChart></ResponsiveContainer>
+                </div>
+            );
+        };
+
+        const DashboardView = ({ balance, stats, currentTime, activityLog, checkInState, onCheckIn }) => (
+            <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl pb-20">
+                <DayProgressCard currentTime={currentTime} />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="md:col-span-1"><CheckInCard checkIn={checkInState} onCheckIn={onCheckIn} /></div>
+                    <div className="bg-black border border-brand-900 p-4 rounded flex flex-col justify-between h-32 relative overflow-hidden"><div className="absolute top-0 right-0 p-2 opacity-20 text-brand-500"><Coins size={60}/></div><div className="text-xs text-brand-600 font-bold uppercase">算力储备</div><div className="text-4xl font-mono-cn text-brand-400 font-bold">{balance}</div></div>
+                    <div className="bg-black border border-gray-800 p-4 rounded h-32 flex flex-col justify-between"><div className="text-xs text-orange-700 font-bold uppercase flex items-center gap-2"><Flame size={14}/> 连胜记录</div><div className="text-4xl font-mono-cn text-gray-200">{stats.streak}<span className="text-sm text-gray-600 ml-1">天</span></div></div>
+                    <div className="bg-black border border-gray-800 p-4 rounded h-32 flex flex-col justify-between"><div className="text-xs text-blue-700 font-bold uppercase flex items-center gap-2"><Zap size={14}/> 今日操作</div><div className="text-4xl font-mono-cn text-gray-200">{stats.todayCount}</div></div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><WeeklyChart activityLog={activityLog} /><Heatmap activityLog={activityLog} /></div>
+            </div>
+        );
+
+        const MissionControlView = ({ tasks, activityLog, today, currentTime, onTaskClick, isTaskCompleted, getWeeklyTaskCount }) => {
+            const sections = [
+                { title: "守护进程 (日常)", icon: RotateCw, color: "brand", items: tasks.filter(t => t.type === 'daily') },
+                { title: "后台服务 (常驻)", icon: Repeat, color: "violet", items: tasks.filter(t => t.type === 'permanent') },
+                { title: "定期维护 (周常)", icon: Calendar, color: "blue", items: tasks.filter(t => t.type === 'weekly') },
+                { title: "紧急补丁 (限时)", icon: Hourglass, color: "amber", items: tasks.filter(t => t.type === 'limited') },
+            ];
+            return (
+                <div className="max-w-5xl animate-in slide-in-from-right-4 duration-300 pb-24">
+                    <div className="flex justify-between items-end mb-6 border-b border-gray-800 pb-4"><div><h2 className="text-2xl font-bold text-white font-mono-cn tracking-tight">任务管理器</h2><p className="text-xs text-gray-500 font-mono-cn mt-1">> 执行协议以获取算力。</p></div><div className="hidden md:block text-right"><div className="text-xs text-gray-600 uppercase">今日产出</div><div className="text-xl font-bold text-brand-500 font-mono-cn">+{(activityLog[today] || []).reduce((acc, c) => acc + (c.value || 0), 0)}</div></div></div>
+                    <div className="space-y-8">
+                        {sections.map((section, idx) => (
+                            <div key={idx}>
+                                <div className={`flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-widest text-gray-500`}><section.icon size={14} />{section.title} <span className="bg-gray-800 px-1.5 rounded text-gray-400">{section.items.length}</span></div>
+                                {section.items.length > 0 ? ( 
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                        {section.items.map(task => (
+                                            <TaskItem 
+                                                key={task.id} 
+                                                task={task} 
+                                                isCompleted={isTaskCompleted(task)} 
+                                                timeStatus={getTaskTimeStatus(task, currentTime)} 
+                                                onClick={() => onTaskClick(task)} 
+                                                weeklyCount={getWeeklyTaskCount(task, activityLog, today)}
+                                            />
+                                        ))}
+                                    </div> 
+                                ) : <div className="text-xs text-gray-600 border border-dashed border-gray-800 p-4 rounded text-center font-mono-cn">未发现活动进程</div>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const StoreView = ({ balance, rewards, redeemReward, setActiveTab, dailySpecials, onRedeemSpecial }) => (
+            <div className="max-w-6xl animate-in slide-in-from-right-4 duration-300 pb-24">
+                <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4"><div><h2 className="text-2xl font-bold text-white font-mono-cn tracking-tight">软件包管理器</h2><p className="text-xs text-gray-500 font-mono-cn mt-1">> 消耗算力安装软件包。</p></div><div className="text-right"><div className="text-xs text-gray-600 uppercase">可用算力</div><div className="text-xl font-bold text-brand-500 font-mono-cn">{balance} <span className="text-sm">CP</span></div></div></div>
+                
+                {dailySpecials && dailySpecials.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+                        {dailySpecials.map(ds => ( <DailySpecialCard key={ds.id} dailySpecial={ds} balance={balance} onRedeem={onRedeemSpecial} /> ))}
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {rewards.map(reward => <RewardCard key={reward.id} reward={reward} balance={balance} onRedeem={redeemReward} />)}
+                    <button onClick={() => setActiveTab('settings')} className="flex flex-col items-center justify-center p-6 rounded border border-dashed border-gray-800 hover:border-brand-500 hover:bg-gray-900/30 transition-colors h-full min-h-[120px] group"><div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center mb-2 group-hover:text-brand-500"><Plus size={20} /></div><span className="text-xs text-gray-500 font-mono-cn group-hover:text-gray-300">添加新包</span></button>
+                </div>
+            </div>
+        );
+
+        const InventoryView = ({ inventory, useInventoryItem, deleteInventoryItem, unlockedAchievements }) => {
+            const activeItems = (inventory || []).filter(i => !i.used).sort((a,b) => b.id - a.id);
+            const usedItems = (inventory || []).filter(i => i.used).sort((a,b) => new Date(b.usedAt) - new Date(a.usedAt));
+
+            return (
+                <div className="max-w-4xl animate-in slide-in-from-right-4 duration-300 pb-24">
+                    <div className="mb-6 border-b border-gray-800 pb-4"><h2 className="text-2xl font-bold text-white font-mono-cn">本地存储</h2></div>
+                    <div className="space-y-8">
+                        <section>
+                            <div className="flex items-center gap-2 mb-4 text-gray-400 font-bold text-xs uppercase tracking-widest"><Medal size={16} /><h3>荣誉证书 ({unlockedAchievements.length}/{ACHIEVEMENTS.length})</h3></div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {ACHIEVEMENTS.map(ach => {
+                                    const isUnlocked = unlockedAchievements.includes(ach.id);
+                                    return (
+                                        <div key={ach.id} className={`flex items-center gap-3 p-3 rounded border transition-all ${isUnlocked ? 'border-yellow-900/50 bg-yellow-900/10' : 'border-gray-800 bg-black opacity-40'}`}>
+                                            <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${isUnlocked ? 'text-yellow-500' : 'text-gray-600'}`}>{isUnlocked ? <ach.icon size={18} /> : <Lock size={16} />}</div>
+                                            <div><div className={`font-bold text-sm ${isUnlocked ? 'text-gray-200' : 'text-gray-600'}`}>{ach.title}</div><div className="text-[10px] text-gray-500">{ach.desc}</div></div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </section>
+
+                        <section><div className="flex items-center gap-2 mb-4 text-gray-400 font-bold text-xs uppercase tracking-widest"><Backpack size={16} /><h3>二进制物品 ({activeItems.length})</h3></div>{activeItems.length > 0 ? <div className="grid gap-2">{activeItems.map(item => <InventoryItem key={item.id} item={item} onUse={useInventoryItem} onDelete={deleteInventoryItem} />)}</div> : <div className="bg-black p-8 text-center text-gray-600 border border-dashed border-gray-800 text-xs font-mono-cn">目录为空</div>}</section>
+                        {usedItems.length > 0 && (<section><details className="group"><summary className="flex items-center gap-2 mb-4 text-gray-500 cursor-pointer font-bold text-xs uppercase tracking-widest"><History size={16} /><span>历史记录 ({usedItems.length})</span></summary><div className="grid gap-2 pl-2 border-l border-gray-800">{usedItems.map(item => <InventoryItem key={item.id} item={item} onUse={useInventoryItem} onDelete={deleteInventoryItem} />)}</div></details></section>)}
+                    </div>
+                </div>
+            );
+        };
+
+        const SettingsView = ({ tasks, rewards, addTask, removeTask, addReward, removeReward, exportData, importData, resetAllData, fileInputRef, jumpTo, soundEnabled, setSoundEnabled, dailySpecials, addDailySpecial, removeDailySpecial, avatar, setAvatar, lastBackup }) => {
+            const [tab, setTab] = useState('tasks');
+            useEffect(() => { if(jumpTo) setTab(jumpTo); }, [jumpTo]);
+            const [title, setTitle] = useState(''); const [val, setVal] = useState(''); const [expVal, setExpVal] = useState(''); const [type, setType] = useState('daily'); const [diff, setDiff] = useState('medium'); const [deadline, setDeadline] = useState('');
+            const [weeklyCount, setWeeklyCount] = useState(1);
+            const [isHot, setIsHot] = useState(false);
+            const [rTitle, setRTitle] = useState(''); const [rCost, setRCost] = useState('');
+            const [sTitle, setSTitle] = useState(''); const [sCost, setSCost] = useState('');
+            const [avatarUrl, setAvatarUrl] = useState('');
+
+            const handleAddTask = () => { addTask(title, val, expVal || val, type, deadline, diff, weeklyCount, isHot); setTitle(''); setVal(''); setExpVal(''); setDeadline(''); setIsHot(false); setWeeklyCount(1); };
+            const handleAddReward = () => { addReward(rTitle, rCost); setRTitle(''); setRCost(''); };
+            const handleAddSpecial = () => { addDailySpecial(sTitle, sCost); setSTitle(''); setSCost(''); };
+            const handleAvatarUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 500 * 1024) { alert("图片太大，请上传小于 500KB 的图片"); return; }
+                    const reader = new FileReader();
+                    reader.onloadend = () => { setAvatar(reader.result); };
+                    reader.readAsDataURL(file);
+                }
+            };
+            const handleAvatarUrl = () => { if(avatarUrl.trim()) { setAvatar(avatarUrl); setAvatarUrl(''); } };
+
+            return (
+                <div className="max-w-4xl animate-in slide-in-from-bottom-4 duration-300 pb-24">
+                    <h2 className="text-2xl font-bold text-white mb-6 font-mono-cn">系统配置</h2>
+                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-thin"><button onClick={()=>setTab('tasks')} className={`px-4 py-2 rounded font-bold text-xs uppercase tracking-wide transition-colors ${tab==='tasks'?'bg-brand-700 text-white':'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}>进程管理</button><button onClick={()=>setTab('rewards')} className={`px-4 py-2 rounded font-bold text-xs uppercase tracking-wide transition-colors ${tab==='rewards'?'bg-brand-700 text-white':'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}>软件包</button><button onClick={()=>setTab('data')} className={`px-4 py-2 rounded font-bold text-xs uppercase tracking-wide transition-colors ${tab==='data'?'bg-brand-700 text-white':'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}>数据与档案</button></div>
+                    
+                    {tab==='data' && (
+                        <div className="space-y-6">
+                            <div className="bg-black p-6 rounded border border-gray-800">
+                                <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 text-sm"><User size={16}/> 个人档案</h3>
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex items-center gap-4">
+                                        {avatar ? <img src={avatar} className="w-16 h-16 rounded border border-gray-700 object-cover" /> : <div className="w-16 h-16 rounded bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-500"><User size={32}/></div>}
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-500 mb-1">上传头像 (Max 500KB)</div>
+                                            <input type="file" accept="image/*" onChange={handleAvatarUpload} className="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-brand-500 hover:file:bg-gray-700 mb-2"/>
+                                            <div className="flex gap-2">
+                                                <input placeholder="或图片链接..." value={avatarUrl} onChange={e=>setAvatarUrl(e.target.value)} className="flex-1 p-2 bg-gray-900 border border-gray-700 rounded text-xs text-white" />
+                                                <button onClick={handleAvatarUrl} className="px-3 py-1 bg-gray-800 text-white text-xs rounded hover:bg-gray-700">设置</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* DATA_IO SECTION: Professional Look */}
+                            <div className="bg-black p-6 rounded border border-gray-800 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-5"><HardDrive size={80} /></div>
+                                <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 text-sm relative z-10"><Database size={16}/> 数据中心 (DATA_IO)</h3>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                                    {/* Storage Status */}
+                                    <div className="bg-gray-900/50 p-4 rounded border border-gray-800 flex flex-col justify-between">
+                                        <div>
+                                            <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">LOCAL_STORAGE_STATUS</div>
+                                            <div className="text-lg font-bold text-brand-500 font-mono flex items-center gap-2"><CheckCircle2 size={16} /> OPTIMAL</div>
+                                        </div>
+                                        <div className="mt-4">
+                                            <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                                                <span>USAGE</span>
+                                                <span>&lt; 1%</span>
+                                            </div>
+                                            <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                                                <div className="h-full bg-brand-500 w-[1%]"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Backup Controls */}
+                                    <div className="flex flex-col gap-3">
+                                        <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">BACKUP_PROTOCOLS</div>
+                                        <button onClick={exportData} className="w-full py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white rounded text-xs font-bold flex items-center justify-center gap-2 transition-all">
+                                            <Download size={14}/> 导出数据 (JSON)
+                                        </button>
+                                        <label className="w-full py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white rounded text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all">
+                                            <Upload size={14}/> 导入数据 (JSON)
+                                            <input type="file" hidden accept=".json" ref={fileInputRef} onChange={importData}/>
+                                        </label>
+                                        <div className="text-[9px] text-gray-600 text-center font-mono">
+                                            LAST_BACKUP: {lastBackup}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Danger Zone */}
+                                <div className="mt-6 pt-4 border-t border-gray-800 relative z-10">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-[10px] text-red-900/50 uppercase font-bold flex items-center gap-1"><AlertTriangle size={12}/> DANGER_ZONE</div>
+                                        <button onClick={resetAllData} className="px-3 py-1 bg-red-900/10 hover:bg-red-900/30 text-red-700 hover:text-red-500 border border-red-900/30 rounded text-[10px] font-bold flex items-center gap-1 transition-all">
+                                            <RotateCcw size={12} /> 格式化系统
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-black p-6 rounded border border-gray-800"><h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 text-sm"><Volume2 size={16}/> 音效配置</h3><button onClick={() => { setSoundEnabled(!soundEnabled); if(!soundEnabled) playSound('success'); }} className={`flex items-center gap-3 px-4 py-2 rounded border w-full md:w-auto transition-all text-xs font-bold ${soundEnabled ? 'bg-brand-900/30 border-brand-700 text-brand-400' : 'bg-gray-900 border-gray-700 text-gray-500'}`}>{soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}<span>{soundEnabled ? '已启用 (ENABLED)' : '已静音 (MUTED)'}</span></button></div>
+                        </div>
+                    )}
+
+                    {tab==='tasks' && (
+                        <div className="bg-black p-6 rounded border border-gray-800">
+                            <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 text-sm"><Sword size={16}/> 初始化新进程</h3>
+                            <div className="flex flex-col gap-3 mb-8">
+                                <div className="flex flex-col md:flex-row gap-3"><input placeholder="名称" className="flex-1 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm focus:border-brand-500 outline-none" value={title} onChange={e=>setTitle(e.target.value)} /><input type="number" placeholder="算力" className="w-full md:w-20 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={val} onChange={e=>setVal(e.target.value)} /><input type="number" placeholder="经验" className="w-full md:w-20 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={expVal} onChange={e=>setExpVal(e.target.value)} /></div>
+                                <div className="flex flex-col md:flex-row gap-3"><select className="w-full p-2 border border-gray-700 bg-gray-900 text-gray-300 rounded text-sm" value={type} onChange={e=>setType(e.target.value)}><option value="daily">守护进程</option><option value="weekly">定期维护</option><option value="limited">紧急补丁</option><option value="permanent">后台服务</option></select><select className="w-full p-2 border border-gray-700 bg-gray-900 text-gray-300 rounded text-sm" value={diff} onChange={e=>setDiff(e.target.value)}><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></div>
+                                <div className="flex gap-4 items-center">
+                                    <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                                        <input type="checkbox" checked={isHot} onChange={e=>setIsHot(e.target.checked)} className="rounded bg-gray-800 border-gray-600 text-brand-500 focus:ring-0"/> 
+                                        <span>设为高优 (HOT)</span>
+                                    </label>
+                                    {type === 'weekly' && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-gray-400">每周需做:</span>
+                                            <input type="number" min="1" max="7" value={weeklyCount} onChange={e=>setWeeklyCount(parseInt(e.target.value))} className="w-12 p-1 text-center bg-gray-900 border border-gray-700 rounded text-white text-sm" />
+                                            <span className="text-sm text-gray-400">次</span>
+                                        </div>
+                                    )}
+                                </div>
+                                {type === 'limited' && <input type="date" className="p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={deadline} onChange={e=>setDeadline(e.target.value)} />}
+                                <button onClick={handleAddTask} className="bg-brand-700 hover:bg-brand-600 text-white px-4 py-2 rounded text-sm font-bold transition-colors w-full md:w-auto self-end">执行</button>
+                            </div>
+                            <div className="space-y-1 max-h-[300px] overflow-y-auto pr-2">{tasks.map(t=><div key={t.id} className="flex justify-between items-center p-2 border-b border-gray-800 hover:bg-gray-900/50"><div className="flex items-center gap-2"><span className="text-[10px] bg-gray-800 text-gray-400 px-1 rounded uppercase w-12 text-center">{t.type.substring(0,4)}</span><span className="text-gray-300 text-sm">{t.title}</span></div><button onClick={()=>removeTask(t.id)} className="text-gray-600 hover:text-red-500"><Trash2 size={14}/></button></div>)}</div>
+                        </div>
+                    )}
+
+                    {tab==='rewards' && (
+                        <div className="bg-black p-6 rounded border border-gray-800">
+                             <div className="mb-8 border-b border-gray-800 pb-6">
+                                <h3 className="font-bold text-pink-500 mb-4 flex items-center gap-2 text-sm"><TimerReset size={16}/> 每日特惠配置</h3>
+                                <div className="flex gap-3 mb-4">
+                                    <input placeholder="特惠商品名称" className="flex-1 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={sTitle} onChange={e=>setSTitle(e.target.value)} />
+                                    <input type="number" placeholder="价格" className="w-24 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={sCost} onChange={e=>setSCost(e.target.value)} />
+                                    <button onClick={handleAddSpecial} className="bg-pink-700 hover:bg-pink-600 text-white px-4 py-2 rounded text-sm font-bold">添加</button>
+                                </div>
+                                <div className="space-y-1 max-h-[150px] overflow-y-auto pr-2">{dailySpecials.map(ds => ( <div key={ds.id} className="flex justify-between items-center p-2 border-b border-gray-800"><span className="text-gray-300 text-sm">{ds.title}</span><div className="flex items-center gap-3"><span className="text-xs font-bold text-pink-500">-{ds.cost}</span><button onClick={() => removeDailySpecial(ds.id)} className="text-gray-600 hover:text-red-500"><Trash2 size={14}/></button></div></div> ))}</div>
+                            </div>
+
+                            <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 text-sm"><Star size={16}/> 标准软件包配置</h3>
+                            <div className="flex gap-3 mb-8"><input placeholder="包名" className="flex-1 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={rTitle} onChange={e=>setRTitle(e.target.value)} /><input type="number" placeholder="价格" className="w-24 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={rCost} onChange={e=>setRCost(e.target.value)} /><button onClick={handleAddReward} className="bg-brand-700 hover:bg-brand-600 text-white px-4 py-2 rounded text-sm font-bold">添加</button></div>
+                            <div className="space-y-1 max-h-[200px] overflow-y-auto pr-2">{rewards.map(r=><div key={r.id} className="flex justify-between items-center p-2 border-b border-gray-800"><span className="text-gray-300 text-sm">{r.title}</span><div className="flex items-center gap-3"><span className="text-xs font-bold text-brand-500">-{r.cost}</span><button onClick={()=>removeReward(r.id)} className="text-gray-600 hover:text-red-500"><Trash2 size={14}/></button></div></div>)}</div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const FocusModeView = ({ tasks, focusState, setFocusState, activityLog, today, addRewards, setCompletedLimited, completedLimited, showNotification, setActivityLog, soundEnabled, isTaskCompleted }) => {
+            // FIX: Ensure availableTasks is defined
+            const availableTasks = useMemo(() => {
+                return tasks.filter(t => !isTaskCompleted(t));
+            }, [tasks, isTaskCompleted]);
+
+            const [selectedTaskId, setSelectedTaskId] = useState(focusState.activeTaskId || (availableTasks.length > 0 ? availableTasks[0].id : null));
+            const activeTask = tasks.find(t => t.id === Number(focusState.activeTaskId));
+            const focusLogs = (activityLog[today] || []).filter(log => log.duration > 0).sort((a,b) => b.timestamp - a.timestamp);
+
+            const startFocus = (taskId) => setFocusState({ activeTaskId: taskId, startTime: new Date().toISOString(), elapsed: 0, isRunning: true });
+            const stopFocus = (completed) => {
+                if (completed && activeTask) {
+                    const now = new Date();
+                    const endTimeStr = now.toISOString();
+                    const startTime = new Date(focusState.startTime);
+                    const actualDuration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+
+                    const newLog = { 
+                        taskId: activeTask.id, 
+                        type: activeTask.type, 
+                        value: activeTask.value, 
+                        timestamp: Date.now(), 
+                        startTime: focusState.startTime, 
+                        endTime: endTimeStr, 
+                        duration: actualDuration 
+                    };
+                    
+                    const newLogsForToday = [...(activityLog[today] || []), newLog];
+                    const newActivityLog = { ...activityLog, [today]: newLogsForToday };
+                    setActivityLog(newActivityLog);
+                    
+                    addRewards(activeTask.value, activeTask.exp || activeTask.value, newActivityLog);
+
+                    if (activeTask.type === 'limited') setCompletedLimited([...completedLimited, activeTask.id]);
+                    showNotification("专注完成！");
+                    if(soundEnabled) playSound('success');
+                }
+                setFocusState({ activeTaskId: null, startTime: null, elapsed: 0, isRunning: false });
+            };
+
+            return (
+                <div className="max-w-4xl animate-in slide-in-from-right-4 duration-300 pb-24">
+                    <div className="mb-8"><h2 className="text-3xl font-bold text-white font-mono-cn">意识深潜</h2></div>
+                    <div className="bg-black rounded-xl p-8 border border-gray-800 text-center relative overflow-hidden mb-8">
+                        <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${focusState.isRunning ? 'from-blue-600 via-purple-600 to-pink-600 animate-pulse-slow' : 'from-gray-800 to-gray-700'}`}></div>
+                        {focusState.activeTaskId ? (
+                            <div className="flex flex-col items-center">
+                                <div className="text-xs text-brand-500 font-bold mb-2 uppercase tracking-widest animate-pulse">:: 连接已建立 ::</div>
+                                <h3 className="text-xl font-bold text-white mb-8 font-mono-cn">{activeTask?.title}</h3>
+                                <div className="text-6xl font-mono-cn font-bold text-white mb-8 tracking-tighter">{formatTimerDisplay(focusState.elapsed)}</div>
+                                <div className="flex gap-4">
+                                    <button onClick={() => setFocusState(p => ({...p, isRunning: !p.isRunning}))} className="w-16 h-16 rounded-full border border-yellow-700 text-yellow-500 flex items-center justify-center hover:bg-yellow-900/20 transition-all">{focusState.isRunning ? <Pause size={24}/> : <Play size={24}/>}</button>
+                                    <button onClick={() => stopFocus(true)} className="w-16 h-16 rounded-full border border-brand-500 bg-brand-900/20 text-brand-400 flex items-center justify-center hover:bg-brand-900/40 transition-all shadow-[0_0_15px_rgba(34,197,94,0.2)]"><CheckCircle size={24}/></button>
+                                    <button onClick={() => stopFocus(false)} className="w-16 h-16 rounded-full border border-gray-700 text-gray-500 flex items-center justify-center hover:bg-gray-800 transition-all"><Square size={20}/></button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="w-full max-w-md mx-auto">
+                                <div className="mb-6"><label className="block text-left text-xs font-bold text-gray-500 mb-2 uppercase">目标协议</label>
+                                    <select value={selectedTaskId || ''} onChange={e => setSelectedTaskId(Number(e.target.value))} className="w-full p-3 rounded bg-gray-900 border border-gray-700 text-gray-300 focus:border-brand-500 outline-none text-sm">
+                                        <option value="" disabled>选择待执行协议...</option>
+                                        {availableTasks.map(t => <option key={t.id} value={t.id}>{t.title} (+{t.value} 算力)</option>)}
+                                    </select>
+                                </div>
+                                <button onClick={() => selectedTaskId && startFocus(selectedTaskId)} disabled={!selectedTaskId} className="w-full py-3 bg-brand-700 hover:bg-brand-600 text-white font-bold rounded flex items-center justify-center gap-2 transition-all uppercase text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"><Play size={16} /> 初始化连接</button>
+                            </div>
+                        )}
+                    </div>
+                    <div className="space-y-4">
+                        <h3 className="font-bold text-gray-400 flex items-center gap-2 text-xs uppercase tracking-widest"><History size={14} /> 会话日志</h3>
+                        {focusLogs.length > 0 ? (
+                            <div className="bg-black rounded border border-gray-800 divide-y divide-gray-800 overflow-hidden">
+                                {focusLogs.map((log, index) => {
+                                    const logTask = tasks.find(t => t.id === log.taskId) || { title: 'Unknown' };
+                                    return ( <div key={index} className="grid grid-cols-12 gap-4 p-3 items-center hover:bg-gray-900/50 transition-colors text-xs font-mono-cn"><div className="col-span-4 text-gray-300 truncate">{logTask.title}</div><div className="col-span-3 text-gray-600">{formatTimeOnly(log.startTime)} > {formatTimeOnly(log.endTime)}</div><div className="col-span-3 text-brand-500">{formatDuration(log.duration)}</div><div className="col-span-2 text-right text-gray-400">+{log.value}</div></div> );
+                                })}
+                            </div>
+                        ) : <div className="text-center py-8 text-gray-700 border border-dashed border-gray-800 rounded text-xs font-mono-cn">暂无数据</div>}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App Component ---
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [darkMode, setDarkMode] = useState(true); // Default dark mode for terminal theme
+            const [currentTime, setCurrentTime] = useState(new Date());
+            
+            // --- State ---
+            const [tasks, setTasks] = useState(() => { const saved = localStorage.getItem('lc_hunt_tasks'); return saved ? JSON.parse(saved) : DEFAULT_TASKS; });
+            const [rewards, setRewards] = useState(() => { const saved = localStorage.getItem('lc_hunt_rewards'); return saved ? JSON.parse(saved) : DEFAULT_REWARDS; });
+            const [balance, setBalance] = useState(() => { const saved = localStorage.getItem('lc_hunt_balance'); return saved ? parseInt(saved, 10) : 0; });
+            const [xp, setXP] = useState(() => { const saved = localStorage.getItem('lc_hunt_xp'); return saved ? parseInt(saved, 10) : 0; });
+            const [activityLog, setActivityLog] = useState(() => { const saved = localStorage.getItem('lc_hunt_log'); return saved ? JSON.parse(saved) : {}; });
+            const [completedLimited, setCompletedLimited] = useState(() => { const saved = localStorage.getItem('lc_hunt_limited'); return saved ? JSON.parse(saved) : []; });
+            const [inventory, setInventory] = useState(() => { const saved = localStorage.getItem('lc_hunt_inventory'); return saved ? JSON.parse(saved) : []; });
+            const [focusState, setFocusState] = useState(() => { const saved = localStorage.getItem('lc_hunt_focus'); return saved ? JSON.parse(saved) : { activeTaskId: null, startTime: null, elapsed: 0, isRunning: false }; });
+            const [soundEnabled, setSoundEnabled] = useState(() => { const saved = localStorage.getItem('lc_hunt_sound'); return saved ? JSON.parse(saved) : true; });
+            const [checkInState, setCheckInState] = useState(() => { const saved = localStorage.getItem('lc_hunt_checkin'); return saved ? JSON.parse(saved) : { lastCheckIn: '', streak: 0 }; });
+            const [unlockedAchievements, setUnlockedAchievements] = useState(() => { const saved = localStorage.getItem('lc_hunt_achievements'); return saved ? JSON.parse(saved) : []; });
+            const [dailySpecials, setDailySpecials] = useState(() => { const saved = localStorage.getItem('lc_hunt_daily_specials_list'); if (saved) return JSON.parse(saved); const old = localStorage.getItem('lc_hunt_daily_special'); return old ? [JSON.parse(old)] : DEFAULT_DAILY_SPECIALS; });
+            const [avatar, setAvatar] = useState(() => localStorage.getItem('lc_hunt_avatar') || '');
+            const [dailyNotes, setDailyNotes] = useState(() => { const saved = localStorage.getItem('lc_hunt_notes'); return saved ? JSON.parse(saved) : {}; });
+            // New state for backup tracking
+            const [lastBackup, setLastBackup] = useState(() => localStorage.getItem('lc_hunt_last_backup') || '无记录');
+
+            const [notification, setNotification] = useState(null);
+            const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+            const [showLotteryModal, setShowLotteryModal] = useState(false); 
+
+            const fileInputRef = useRef(null);
+            const timerRef = useRef(null);
+
+            // --- Effects ---
+            useEffect(() => {
+                const DATA_VERSION = "3.19"; 
+                const savedVersion = localStorage.getItem('lc_hunt_version');
+                if (savedVersion !== DATA_VERSION) { 
+                    console.log("System updated to v3.19"); 
+                    localStorage.setItem('lc_hunt_version', DATA_VERSION); 
+                }
+                
+                // 修复历史数据：根据 startTime 和 endTime 重新计算 duration
+                setActivityLog(prev => {
+                    const nextLog = { ...prev };
+                    let hasFixes = false;
+                    Object.keys(nextLog).forEach(date => {
+                        nextLog[date] = nextLog[date].map(log => {
+                            if (log.startTime && log.endTime && typeof log.duration === 'number') {
+                                const start = new Date(log.startTime).getTime();
+                                const end = new Date(log.endTime).getTime();
+                                const realDuration = Math.floor((end - start) / 1000);
+                                // 如果误差超过2秒，则修正
+                                if (realDuration > 0 && Math.abs(log.duration - realDuration) > 2) {
+                                    hasFixes = true;
+                                    return { ...log, duration: realDuration };
+                                }
+                            }
+                            return log;
+                        });
+                    });
+                    if (hasFixes) {
+                        console.log("Historical time data corrected.");
+                    }
+                    return hasFixes ? nextLog : prev;
+                });
+
+                if (focusState.isRunning && focusState.startTime) { 
+                    const startTime = new Date(focusState.startTime); 
+                    const now = new Date(); 
+                    const diffSeconds = Math.floor((now - startTime) / 1000); 
+                    if (diffSeconds > 0) setFocusState(prev => ({ ...prev, elapsed: diffSeconds })); 
+                }
+                
+                const errorHandler = (e) => { console.error("System Failure:", e); showNotification("系统错误", "error"); };
+                window.addEventListener('error', errorHandler); return () => window.removeEventListener('error', errorHandler);
+            }, []);
+
+            useEffect(() => { localStorage.setItem('lc_hunt_tasks', JSON.stringify(tasks)); }, [tasks]);
+            useEffect(() => { localStorage.setItem('lc_hunt_rewards', JSON.stringify(rewards)); }, [rewards]);
+            useEffect(() => { localStorage.setItem('lc_hunt_balance', balance.toString()); }, [balance]);
+            useEffect(() => { localStorage.setItem('lc_hunt_xp', xp.toString()); }, [xp]); 
+            useEffect(() => { localStorage.setItem('lc_hunt_log', JSON.stringify(activityLog)); }, [activityLog]);
+            useEffect(() => { localStorage.setItem('lc_hunt_limited', JSON.stringify(completedLimited)); }, [completedLimited]);
+            useEffect(() => { localStorage.setItem('lc_hunt_inventory', JSON.stringify(inventory)); }, [inventory]);
+            useEffect(() => { localStorage.setItem('lc_hunt_focus', JSON.stringify(focusState)); }, [focusState]);
+            useEffect(() => { localStorage.setItem('lc_hunt_sound', JSON.stringify(soundEnabled)); }, [soundEnabled]);
+            useEffect(() => { localStorage.setItem('lc_hunt_checkin', JSON.stringify(checkInState)); }, [checkInState]);
+            useEffect(() => { localStorage.setItem('lc_hunt_achievements', JSON.stringify(unlockedAchievements)); }, [unlockedAchievements]);
+            useEffect(() => { localStorage.setItem('lc_hunt_daily_specials_list', JSON.stringify(dailySpecials)); }, [dailySpecials]);
+            useEffect(() => { localStorage.setItem('lc_hunt_avatar', avatar); }, [avatar]);
+            useEffect(() => { localStorage.setItem('lc_hunt_notes', JSON.stringify(dailyNotes)); }, [dailyNotes]);
+
+            useEffect(() => { if (darkMode) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); }, [darkMode]);
+            useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 60000); return () => clearInterval(timer); }, []);
+            
+            // 修复：每次重新计算时间差，而不是简单累加
+            useEffect(() => { 
+                if (focusState.isRunning && focusState.startTime) { 
+                    timerRef.current = setInterval(() => { 
+                        const now = new Date();
+                        const start = new Date(focusState.startTime);
+                        const diff = Math.floor((now - start) / 1000);
+                        setFocusState(prev => ({ ...prev, elapsed: diff })); 
+                    }, 1000); 
+                } else { 
+                    clearInterval(timerRef.current); 
+                } 
+                return () => clearInterval(timerRef.current); 
+            }, [focusState.isRunning, focusState.startTime]);
+
+            // --- Handlers ---
+            // Fix 2: Explicitly construct Date objects for weekly calculation to avoid timezone issues
+            const getWeeklyTaskCount = (task, allLogs, today) => {
+                if (task.type !== 'weekly') return 0;
+                
+                const parts = today.split('-');
+                // Force noon to avoid DST/timezone midnight shifts
+                const curr = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+                
+                const day = curr.getDay(); // 0 is Sunday
+                const daysFromMonday = day === 0 ? 6 : day - 1;
+                
+                const monday = new Date(curr);
+                monday.setDate(curr.getDate() - daysFromMonday);
+                
+                const weekDates = [];
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate() + i);
+                    weekDates.push(formatDate(d));
+                }
+
+                let count = 0;
+                weekDates.forEach(date => {
+                    const logs = allLogs[date] || [];
+                    count += logs.filter(l => l.taskId === task.id).length;
+                });
+                return count;
+            };
+
+            const showNotification = (message, type = 'success') => { setNotification({ message, type }); setTimeout(() => setNotification(null), 3000); };
+            const today = formatDate(new Date());
+
+            const handleClaimLottery = (prize) => { if (!prize) return; try { const newItem = { id: Date.now(), title: prize.title, cost: 0, redeemedAt: new Date().toISOString(), used: false, usedAt: null, source: '等级补给' }; setInventory(prev => [newItem, ...prev]); setShowLotteryModal(false); showNotification(`补给已送达：${prize.title}`, 'success'); } catch (error) { console.error("Drop failed:", error); setShowLotteryModal(false); } };
+
+            const addRewards = (val, exp, updatedLog = null, updatedCheckIn = null) => { 
+                setBalance(prev => prev + val); 
+                setXP(prev => { 
+                    const newXP = prev + exp; 
+                    const oldLevel = calculateLevel(prev); 
+                    const newLevel = calculateLevel(newXP); 
+                    if (newLevel > oldLevel) { 
+                        setTimeout(() => { 
+                            showNotification(`>> 权限提升: ${getRankTitle(newLevel)} (Lv.${newLevel})`, 'success'); 
+                            if(soundEnabled) playSound('levelUp'); 
+                        }, 500); 
+                        if (newLevel % 5 === 0) { setTimeout(() => { setShowLotteryModal(true); if(soundEnabled) playSound('lottery'); }, 1500); } 
+                    } 
+                    return newXP; 
+                }); 
+                const logToCheck = updatedLog || activityLog;
+                const checkInToCheck = updatedCheckIn || checkInState;
+                const xpToCheck = xp + exp;
+                setTimeout(() => checkAchievements(xpToCheck, logToCheck, checkInToCheck), 0); 
+            };
+
+            const checkAchievements = (currentXP, currentActivityLog, currentCheckIn) => { const stats = { totalTasks: Object.values(currentActivityLog).flat().length, totalEarnings: Object.values(currentActivityLog).flat().reduce((acc, l) => acc + (l.value || 0), 0), totalFocusMinutes: Object.values(currentActivityLog).flat().reduce((acc, l) => acc + (l.duration ? l.duration : 0), 0) / 60, checkInStreak: currentCheckIn.streak }; const newUnlocked = []; ACHIEVEMENTS.forEach(ach => { if (!unlockedAchievements.includes(ach.id) && ach.condition(stats)) newUnlocked.push(ach); }); if (newUnlocked.length > 0) { const ids = newUnlocked.map(a => a.id); setUnlockedAchievements(prev => [...prev, ...ids]); const totalReward = newUnlocked.reduce((acc, a) => acc + a.reward, 0); setBalance(prev => prev + totalReward); setXP(prev => prev + totalReward); setTimeout(() => { showNotification(`🏆 解锁 ${newUnlocked.length} 个勋章！获得 ${totalReward} 奖励！`, 'success'); if(soundEnabled) playSound('achievement'); }, 1000); } };
+
+            const handleCheckIn = () => { if (checkInState.lastCheckIn === today) { showNotification("今日链路已连接", "error"); return; } const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); const isConsecutive = checkInState.lastCheckIn === formatDate(yesterday); const newStreak = isConsecutive ? checkInState.streak + 1 : 1; const reward = 10; const newCheckInState = { lastCheckIn: today, streak: newStreak }; setCheckInState(newCheckInState); addRewards(reward, reward, null, newCheckInState); showNotification(`链路连接成功。+${reward} 算力 & 熵 (连续 ${newStreak} 天)`); if(soundEnabled) playSound('success'); };
+
+            const isTaskCompleted = (task) => { if (task.type === 'permanent') return false; if (task.type === 'limited') return completedLimited.includes(task.id); const todayLog = activityLog[today] || []; if (task.type === 'daily') return todayLog.some(log => log.taskId === task.id); if (task.type === 'weekly') { const required = task.requiredCount || 1; const current = getWeeklyTaskCount(task, activityLog, today); return current >= required; } return false; };
+            
+            const handleTaskClick = (task) => { 
+                const completed = isTaskCompleted(task);
+                const timeStatus = getTaskTimeStatus(task, currentTime);
+                if (task.type === 'limited' && timeStatus.isExpired && !completed) { showNotification("协议已过期", "error"); return; }
+                if (task.type === 'limited' && completed) return;
+                
+                if ((task.type === 'daily' || task.type === 'weekly') && completed) {
+                     if(task.type === 'weekly') { showNotification("历史记录无法回滚", "error"); return; }
+                     const todayLog = activityLog[today] || []; const logIndex = todayLog.findIndex(l => l.taskId === task.id);
+                     if (logIndex > -1) {
+                         const newTodayLog = [...todayLog]; newTodayLog.splice(logIndex, 1);
+                         setActivityLog({ ...activityLog, [today]: newTodayLog });
+                         setBalance(prev => Math.max(0, prev - task.value));
+                         setXP(prev => Math.max(0, prev - (task.exp || task.value)));
+                         return;
+                     }
+                }
+
+                if (task.type === 'weekly') {
+                    const required = task.requiredCount || 1;
+                    const current = getWeeklyTaskCount(task, activityLog, today);
+                    if (current < required) {
+                         // Fix 1: Determine if this is the final step
+                         const isFinalStep = (current + 1 === required);
+                         // If final step, log the full reward value, otherwise 0
+                         const logValue = isFinalStep ? task.value : 0;
+                         
+                         const newLogEntry = { taskId: task.id, type: task.type, value: logValue, timestamp: Date.now(), duration: 0 }; 
+                         const newLogsForToday = [...(activityLog[today] || []), newLogEntry];
+                         const newActivityLog = { ...activityLog, [today]: newLogsForToday };
+                         setActivityLog(newActivityLog);
+                         
+                         if (isFinalStep) {
+                             addRewards(task.value, task.exp || task.value, newActivityLog); 
+                             showNotification(`周期任务完成！+${task.value} 算力`);
+                             if(soundEnabled) playSound('success');
+                         } else {
+                             showNotification(`进度更新: ${current + 1}/${required}`);
+                         }
+                         return;
+                    } else { return; }
+                }
+
+                const newLogEntry = { taskId: task.id, type: task.type, value: task.value, timestamp: Date.now(), duration: 0 };
+                const newLogsForToday = [...(activityLog[today] || []), newLogEntry];
+                const newActivityLog = { ...activityLog, [today]: newLogsForToday };
+                
+                setActivityLog(newActivityLog);
+                addRewards(task.value, task.exp || task.value, newActivityLog);
+                
+                if (task.type === 'limited') setCompletedLimited([...completedLimited, task.id]);
+                showNotification(`协议执行完毕。+${task.value} 算力`);
+                if(soundEnabled) playSound('success');
+            };
+
+            const redeemReward = (reward) => { if (balance >= reward.cost) { setBalance(prev => prev - reward.cost); const newItem = { id: Date.now(), title: reward.title, cost: reward.cost, redeemedAt: new Date().toISOString(), used: false, usedAt: null }; setInventory(prev => [newItem, ...prev]); showNotification(`软件包已安装：${reward.title}`, 'success'); if(soundEnabled) playSound('redeem'); } else { showNotification(`算力不足！缺 ${reward.cost - balance}`, 'error'); } };
+
+            const onRedeemSpecial = (special) => { if (balance >= special.cost) { setBalance(prev => prev - special.cost); const newItem = { id: Date.now(), title: special.title, cost: special.cost, redeemedAt: new Date().toISOString(), used: false, usedAt: null, source: '每日特惠' }; setInventory(prev => [newItem, ...prev]); setDailySpecials(prev => prev.map(ds => ds.id === special.id ? { ...ds, lastBoughtDate: formatDate(new Date()) } : ds )); showNotification(`特惠包已安装：${special.title}`, 'success'); if(soundEnabled) playSound('redeem'); } else { showNotification(`算力不足！`, 'error'); } };
+            
+            const addDailySpecial = (title, cost) => { if (!title.trim() || isNaN(parseInt(cost))) return; const newSpecial = { id: Date.now(), title, cost: parseInt(cost), lastBoughtDate: '' }; setDailySpecials([...dailySpecials, newSpecial]); showNotification("已添加至每日特惠", "success"); };
+            const removeDailySpecial = (id) => { setDailySpecials(dailySpecials.filter(ds => ds.id !== id)); };
+
+            const useInventoryItem = (itemId) => { setInventory(prev => prev.map(item => { if (item.id === itemId) return { ...item, used: true, usedAt: new Date().toISOString() }; return item; })); showNotification("物品已消耗。", "success"); };
+            const deleteInventoryItem = (itemId) => { if(confirm('确认删除日志？')) { setInventory(prev => prev.filter(item => item.id !== itemId)); } };
+            const resetAllData = () => { if (window.confirm("⚠️ 系统格式化警告：所有数据将丢失。")) { localStorage.clear(); window.location.reload(); } };
+            const exportData = () => { const data = { tasks, rewards, balance, xp, activityLog, completedLimited, inventory, focusState, checkInState, unlockedAchievements, dailySpecials, avatar, dailyNotes, lastBackup: now, version: "3.19" }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Matrix_v3.19_Backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showNotification("备份已生成。"); };
+            const importData = (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if (confirm("覆盖当前系统数据？")) { setTasks(data.tasks || DEFAULT_TASKS); setRewards(data.rewards || DEFAULT_REWARDS); setBalance(data.balance || 0); setXP(data.xp || 0); setActivityLog(data.activityLog || {}); setCompletedLimited(data.completedLimited || []); setInventory(data.inventory || []); setCheckInState(data.checkInState || { lastCheckIn: '', streak: 0 }); setUnlockedAchievements(data.unlockedAchievements || []); setDailySpecials(data.dailySpecials || DEFAULT_DAILY_SPECIALS); setAvatar(data.avatar || ''); setDailyNotes(data.dailyNotes || {}); setLastBackup(data.lastBackup || '无记录'); showNotification("系统已恢复。", "success"); } } catch (error) { showNotification("文件损坏。", "error"); } }; reader.readAsText(file); event.target.value = null; };
+            const addTask = (title, value, expVal, type, deadline, difficulty, weeklyCount, isHot) => { 
+                if (!title.trim()) return; 
+                const newTask = { 
+                    id: Date.now(), title: title.trim(), value: parseInt(value), exp: parseInt(expVal), 
+                    type, deadline, difficulty, 
+                    requiredCount: type === 'weekly' ? parseInt(weeklyCount) : 1,
+                    isHot: !!isHot
+                }; 
+                setTasks([...tasks, newTask]); 
+                showNotification("协议已注册。", "success"); 
+            };
+            const removeTask = (id) => setTasks(tasks.filter(t => t.id !== id));
+            const addReward = (title, cost) => { if (!title.trim()) return; setRewards([...rewards, { id: Date.now(), title: title.trim(), cost: parseInt(cost) }]); showNotification("软件包已上架。", "success"); };
+            const removeReward = (id) => setRewards(rewards.filter(r => r.id !== id));
+            const stats = useMemo(() => { let currentStreak = 0; let checkDate = new Date(); checkDate.setHours(0,0,0,0); const todayStr = formatDate(checkDate); if (!activityLog[todayStr] || activityLog[todayStr].length === 0) checkDate.setDate(checkDate.getDate() - 1); while (true) { const dateStr = formatDate(checkDate); if (activityLog[dateStr] && activityLog[dateStr].length > 0) { currentStreak++; checkDate.setDate(checkDate.getDate() - 1); } else { break; } } const todayCount = (activityLog[today] || []).length; return { streak: currentStreak, todayCount }; }, [activityLog, today]);
+
+            // --- Render ---
+            return (
+                <div className="flex min-h-screen font-mono-cn bg-black text-gray-300 selection:bg-brand-900 selection:text-brand-100">
+                    {/* Modals */}
+                    {showAchievementsModal && <ProfileModal unlockedAchievements={unlockedAchievements} xp={xp} onClose={() => setShowAchievementsModal(false)} avatar={avatar} />}
+                    {showLotteryModal && <LotteryModal rewards={rewards} onClaim={handleClaimLottery} onClose={() => setShowLotteryModal(false)} />}
+
+                    <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 flex flex-col transform transition-transform duration-300 md:translate-x-0 ${'translate-x-0 hidden md:flex'}`}>
+                        <div className="p-6 flex items-center gap-3 border-b border-gray-800"><div className="text-brand-500"><Terminal size={24} /></div><div><h1 className="text-lg font-bold leading-none text-white tracking-wider">MATRIX</h1><span className="text-xs text-gray-500">v3.19.0 Fix</span></div></div>
+                        <SidebarProfile xp={xp} avatar={avatar} onClick={() => setShowAchievementsModal(true)} />
+                        <nav className="flex-1 p-4 space-y-2">
+                            {[{id: 'dashboard', icon: LayoutDashboard, label: '情报总览'}, {id: 'tasks', icon: Sword, label: '执行协议'}, {id: 'focus', icon: Timer, label: '深潜模式'}, {id: 'journal', icon: BookOpen, label: '系统日志'}, {id: 'store', icon: ShoppingBag, label: '补给站'}, {id: 'inventory', icon: Backpack, label: '存储空间'}, {id: 'settings', icon: Settings, label: '系统设置'}].map(item => (
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3 rounded text-sm tracking-wide transition-all ${activeTab === item.id ? 'bg-brand-900/30 text-brand-400 border-l-2 border-brand-500' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300'}`}><item.icon size={18} /> {item.label}</button>
+                            ))}
+                        </nav>
+                    </aside>
+                    
+                    <div className="fixed bottom-0 left-0 w-full bg-black border-t border-gray-800 md:hidden z-50 flex justify-around p-2 mobile-bottom-nav">
+                        {[{id: 'dashboard', icon: LayoutDashboard, label: 'SYS'}, {id: 'tasks', icon: Sword, label: 'CMD'}, {id: 'focus', icon: Timer, label: 'RUN'}, {id: 'journal', icon: BookOpen, label: 'LOG'}, {id: 'store', icon: ShoppingBag, label: 'PKG'}, {id: 'settings', icon: Settings, label: 'CFG'}].map(item => (
+                            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center p-2 rounded mobile-nav-btn ${activeTab === item.id ? 'text-brand-500' : 'text-gray-600'}`}><item.icon size={20} /><span className="text-[9px] mt-1 tracking-widest">{item.label}</span></button>
+                        ))}
+                    </div>
+
+                    <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pb-24 md:pb-8 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-black to-black">
+                        <div className="max-w-7xl mx-auto">
+                            {activeTab === 'dashboard' && <DashboardView balance={balance} stats={stats} currentTime={currentTime} activityLog={activityLog} checkInState={checkInState} onCheckIn={handleCheckIn} />}
+                            {activeTab === 'tasks' && <MissionControlView tasks={tasks} activityLog={activityLog} today={today} currentTime={currentTime} onTaskClick={handleTaskClick} isTaskCompleted={isTaskCompleted} getWeeklyTaskCount={getWeeklyTaskCount} />}
+                            {activeTab === 'focus' && <FocusModeView tasks={tasks} focusState={focusState} setFocusState={setFocusState} activityLog={activityLog} today={today} addRewards={addRewards} setCompletedLimited={setCompletedLimited} completedLimited={completedLimited} showNotification={showNotification} setActivityLog={setActivityLog} soundEnabled={soundEnabled} isTaskCompleted={isTaskCompleted} />}
+                            {activeTab === 'journal' && <JournalView dailyNotes={dailyNotes} setDailyNotes={setDailyNotes} showNotification={showNotification} activityLog={activityLog} tasks={tasks} />}
+                            {activeTab === 'store' && <StoreView balance={balance} rewards={rewards} redeemReward={redeemReward} setActiveTab={setActiveTab} dailySpecials={dailySpecials} onRedeemSpecial={onRedeemSpecial} />}
+                            {activeTab === 'inventory' && <InventoryView inventory={inventory} useInventoryItem={useInventoryItem} deleteInventoryItem={deleteInventoryItem} unlockedAchievements={unlockedAchievements} />}
+                            {activeTab === 'settings' && <SettingsView tasks={tasks} rewards={rewards} addTask={addTask} removeTask={removeTask} addReward={addReward} removeReward={removeReward} exportData={exportData} importData={importData} resetAllData={resetAllData} fileInputRef={fileInputRef} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} dailySpecials={dailySpecials} addDailySpecial={addDailySpecial} removeDailySpecial={removeDailySpecial} avatar={avatar} setAvatar={setAvatar} lastBackup={lastBackup} />}
+                        </div>
+                    </main>
+                    {notification && (
+                        <div className={`fixed top-6 right-6 left-6 md:left-auto px-4 py-3 rounded border shadow-[0_0_20px_rgba(0,0,0,0.5)] text-sm font-mono-cn z-[60] flex items-center justify-between gap-3 animate-in slide-in-from-top-4 duration-300 ${notification.type === 'error' ? 'bg-red-900/90 border-red-700 text-red-100' : 'bg-brand-900/90 border-brand-700 text-brand-100'}`}>
+                            <div className="flex items-center gap-2">{notification.type === 'error' ? <AlertCircle size={16}/> : <CheckCircle size={16}/>}<span>{notification.message}</span></div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
