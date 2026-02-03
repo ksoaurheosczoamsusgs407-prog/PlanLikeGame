@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>任务协理终端 v3.19 (Stable Fix)</title>
+    <title>任务协理终端 v3.25 (EditFix)</title>
     
     <!-- 1. 加载 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -81,25 +81,25 @@
             Timer, Play, Pause, Square, ChevronRight, Upload, Download, User, BarChart3, Volume2, VolumeX, X,
             Medal, Target, Award, Sparkles, Crosshair, Crown, Cpu, Terminal, ShieldCheck, Box, Lock, TimerReset,
             ShoppingCart, Moon as MoonIcon, Code, Database, Server, Power, Camera, Image as ImageIcon, Circle, CheckCircle2,
-            FileText, Save, BookOpen, BarChart2, HardDrive, RefreshCw, AlertTriangle
+            FileText, Save, BookOpen, BarChart2, HardDrive, RefreshCw, AlertTriangle, Info, Pencil, XCircle
         } from 'lucide-react';
         import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
         // --- 默认数据 ---
         const DEFAULT_TASKS = [
-            { id: 1, title: '机体散热 (运动30m)', value: 40, exp: 50, type: 'daily', difficulty: 'medium', isHot: true },
-            { id: 2, title: '广播协议 (投简历50家)', value: 80, exp: 100, type: 'daily', difficulty: 'hard', isHot: true },
-            { id: 3, title: '代码同步 (Gitee Push)', value: 15, exp: 20, type: 'daily', difficulty: 'easy' },
-            { id: 4, title: '情报获取 (CSDN/知乎)', value: 20, exp: 20, type: 'daily', difficulty: 'easy' },
-            { id: 10, title: '脚本解析 (Python 1.5h)', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
-            { id: 11, title: '版本控制 (Git 1.5h)', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
-            { id: 12, title: '虚拟构建 (Unity 1.5h)', value: 110, exp: 150, type: 'permanent', difficulty: 'medium' },
-            { id: 13, title: '数据库索引 (MySQL)', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
-            { id: 14, title: 'C++ 编译 (二级学习)', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
-            { id: 20, title: '防火墙攻坚 (力扣2h)', value: 200, exp: 300, type: 'limited', difficulty: 'hard', isHot: true },
-            { id: 21, title: '内核编译 (算法+博客)', value: 220, exp: 350, type: 'limited', difficulty: 'hard', isHot: true },
-            { id: 30, title: '底层重构 (C++复习)', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 3 },
-            { id: 31, title: '协议分析 (Linux复习)', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 2 },
+            { id: 1, title: '机体散热 (运动30m)', desc: '跑步机或帕梅拉，保持心率120以上', value: 40, exp: 50, type: 'daily', difficulty: 'medium', isHot: true },
+            { id: 2, title: '广播协议 (投简历50家)', desc: 'Boss直聘/拉勾，针对性投递，记录HR反馈', value: 80, exp: 100, type: 'daily', difficulty: 'hard', isHot: true },
+            { id: 3, title: '代码同步 (Gitee Push)', desc: '提交今日代码变更，保持绿色格子', value: 15, exp: 20, type: 'daily', difficulty: 'easy' },
+            { id: 4, title: '情报获取 (CSDN/知乎)', desc: '关注AI前沿、Vue/React新特性、行业动态', value: 20, exp: 20, type: 'daily', difficulty: 'easy' },
+            { id: 10, title: '脚本解析 (Python 1.5h)', desc: '爬虫或数据分析模块，系统化学习', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
+            { id: 11, title: '版本控制 (Git 1.5h)', desc: '熟悉 Rebase, Merge, Cherry-pick 等命令', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
+            { id: 12, title: '虚拟构建 (Unity 1.5h)', desc: 'C# 脚本编写，场景搭建练习', value: 110, exp: 150, type: 'permanent', difficulty: 'medium' },
+            { id: 13, title: '数据库索引 (MySQL)', desc: '复习索引原理、事务隔离级别、锁机制', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
+            { id: 14, title: 'C++ 编译 (二级学习)', desc: '指针、内存管理、STL 库复习', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
+            { id: 20, title: '防火墙攻坚 (力扣2h)', desc: '至少解决2道中等题或1道困难题', value: 200, exp: 300, type: 'limited', difficulty: 'hard', isHot: true },
+            { id: 21, title: '内核编译 (算法+博客)', desc: '输出今日算法题解，发布到博客', value: 220, exp: 350, type: 'limited', difficulty: 'hard', isHot: true },
+            { id: 30, title: '底层重构 (C++复习)', desc: '深度复习，整理笔记，查漏补缺', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 3 },
+            { id: 31, title: '协议分析 (Linux复习)', desc: '系统编程、网络编程、常用指令', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 2 },
         ];
 
         const DEFAULT_REWARDS = [
@@ -142,7 +142,6 @@
             { id: 'early_access', title: '早鸟测试', desc: '在7:00前完成任务', condition: (stats) => stats.hasMorningActivity, reward: 100, icon: Sun },
         ];
 
-        // --- 音效 ---
         const playSound = (type) => {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -162,7 +161,6 @@
             } catch (e) {}
         };
 
-        // --- Utils ---
         const formatDate = (date) => {
             const d = new Date(date);
             const year = d.getFullYear();
@@ -175,28 +173,20 @@
         const formatDuration = (s) => { const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60; return h>0?`${h}时${m}分` : `${m}分${sec}秒`; };
         const formatTimerDisplay = (s) => { const h=Math.floor(s/3600).toString().padStart(2,'0'), m=Math.floor((s%3600)/60).toString().padStart(2,'0'), sec=(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; };
         
-        // 修复：增强的周日期计算，处理Date对象和字符串
         const getWeekDates = (inputDate) => { 
-            // Robustly handle inputDate: it could be a Date object or a String
             let dateStr = inputDate;
             if (inputDate instanceof Date) {
                 dateStr = formatDate(inputDate);
             }
             if (typeof dateStr !== 'string' || !dateStr) {
-                 // Fallback to today if input is invalid
                  dateStr = formatDate(new Date());
             }
-
             const parts = dateStr.split('-');
-            // Force noon to avoid DST/timezone midnight shifts
             const curr = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
-            
-            const day = curr.getDay(); // 0 is Sunday
+            const day = curr.getDay(); 
             const daysFromMonday = day === 0 ? 6 : day - 1;
-            
             const monday = new Date(curr);
             monday.setDate(curr.getDate() - daysFromMonday);
-            
             const dates = [];
             for (let i = 0; i < 7; i++) {
                 const d = new Date(monday);
@@ -236,6 +226,27 @@
         const getDayProgress = (now) => { const s = new Date(now); s.setHours(0,0,0,0); const total = 86400; const curr = (now - s) / 1000; const p = (curr / total) * 100; const rem = total - curr; const h = Math.floor(rem / 3600); const m = Math.floor((rem % 3600) / 60); return { percent: p, h, m }; };
 
         // --- Components ---
+
+        const SidebarProfile = ({ xp, avatar, onClick }) => {
+            const { currentLevel, nextLevel, progress, title } = calculateLevelProgress(xp);
+            return (
+                <div onClick={onClick} className="cursor-pointer p-4 border-b border-gray-800 hover:bg-gray-900 transition-colors group">
+                     <div className="flex items-center gap-3 mb-2">
+                        {avatar ? (
+                            <img src={avatar} alt="Avatar" className="w-10 h-10 rounded border border-gray-700 object-cover" />
+                        ) : (
+                            <div className="w-10 h-10 rounded bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 group-hover:text-brand-400 group-hover:border-brand-500 transition-colors"><User size={20} /></div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">操作员</div>
+                            <div className="text-sm font-bold text-white truncate font-mono-cn">{title}</div>
+                        </div>
+                     </div>
+                     <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden mb-1"><div className="h-full bg-brand-600 transition-all duration-500" style={{width: `${progress}%`}}></div></div>
+                     <div className="flex justify-between text-[9px] text-gray-600 font-mono-cn"><span>LV.{currentLevel}</span><span>{Math.floor(progress)}% 升级</span></div>
+                </div>
+            );
+        };
 
         const JournalView = ({ dailyNotes, setDailyNotes, showNotification, activityLog, tasks }) => {
             const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
@@ -460,6 +471,9 @@
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className={`font-bold text-sm truncate font-mono-cn ${isCompleted ? 'text-gray-600 line-through' : 'text-gray-300 group-hover:text-brand-100'}`}>{task.title}</div>
+                            {/* 新增：任务描述 */}
+                            {task.desc && <div className={`text-[10px] truncate mt-0.5 font-sans ${isCompleted ? 'text-gray-600' : 'text-gray-500'}`}>{task.desc}</div>}
+                            
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-500 border border-gray-700">{conf.label}</span>
                                 <span className={`text-[10px] font-bold ${diff.color}`}>{diff.label}</span>
@@ -536,27 +550,6 @@
                 <div className="bg-black border border-gray-800 p-4 rounded mb-6 relative overflow-hidden font-mono-cn">
                     <div className="flex justify-between items-end mb-2 relative z-10"><div><h3 className="text-gray-400 text-xs flex items-center gap-2 uppercase tracking-widest"><Clock size={14} className={textColor}/> 每日时间进度</h3><p className="text-[10px] text-gray-600 mt-1">剩余时间: {h}小时 {m}分</p></div><div className={`text-2xl font-bold ${textColor}`}>{Math.floor(percent)}%</div></div>
                     <div className="relative w-full h-2 bg-gray-900 rounded-full overflow-hidden"><div className={`absolute top-0 left-0 h-full bg-gradient-to-r ${progressColor} transition-all duration-1000`} style={{width: `${percent}%`}}></div></div>
-                </div>
-            );
-        };
-
-        const SidebarProfile = ({ xp, avatar, onClick }) => {
-            const { currentLevel, nextLevel, progress, title } = calculateLevelProgress(xp);
-            return (
-                <div onClick={onClick} className="cursor-pointer p-4 border-b border-gray-800 hover:bg-gray-900 transition-colors group">
-                     <div className="flex items-center gap-3 mb-2">
-                        {avatar ? (
-                            <img src={avatar} alt="Avatar" className="w-10 h-10 rounded border border-gray-700 object-cover" />
-                        ) : (
-                            <div className="w-10 h-10 rounded bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 group-hover:text-brand-400 group-hover:border-brand-500 transition-colors"><User size={20} /></div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">操作员</div>
-                            <div className="text-sm font-bold text-white truncate font-mono-cn">{title}</div>
-                        </div>
-                     </div>
-                     <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden mb-1"><div className="h-full bg-brand-600 transition-all duration-500" style={{width: `${progress}%`}}></div></div>
-                     <div className="flex justify-between text-[9px] text-gray-600 font-mono-cn"><span>LV.{currentLevel}</span><span>{Math.floor(progress)}% 升级</span></div>
                 </div>
             );
         };
@@ -686,17 +679,55 @@
             );
         };
 
-        const SettingsView = ({ tasks, rewards, addTask, removeTask, addReward, removeReward, exportData, importData, resetAllData, fileInputRef, jumpTo, soundEnabled, setSoundEnabled, dailySpecials, addDailySpecial, removeDailySpecial, avatar, setAvatar, lastBackup }) => {
+        const SettingsView = ({ tasks, rewards, addTask, updateTask, removeTask, addReward, removeReward, exportData, importData, resetAllData, fileInputRef, jumpTo, soundEnabled, setSoundEnabled, dailySpecials, addDailySpecial, removeDailySpecial, avatar, setAvatar, lastBackup }) => {
             const [tab, setTab] = useState('tasks');
             useEffect(() => { if(jumpTo) setTab(jumpTo); }, [jumpTo]);
             const [title, setTitle] = useState(''); const [val, setVal] = useState(''); const [expVal, setExpVal] = useState(''); const [type, setType] = useState('daily'); const [diff, setDiff] = useState('medium'); const [deadline, setDeadline] = useState('');
+            const [desc, setDesc] = useState('');
             const [weeklyCount, setWeeklyCount] = useState(1);
             const [isHot, setIsHot] = useState(false);
             const [rTitle, setRTitle] = useState(''); const [rCost, setRCost] = useState('');
             const [sTitle, setSTitle] = useState(''); const [sCost, setSCost] = useState('');
             const [avatarUrl, setAvatarUrl] = useState('');
+            const [editingTaskId, setEditingTaskId] = useState(null);
 
-            const handleAddTask = () => { addTask(title, val, expVal || val, type, deadline, diff, weeklyCount, isHot); setTitle(''); setVal(''); setExpVal(''); setDeadline(''); setIsHot(false); setWeeklyCount(1); };
+            const handleAddTask = () => { 
+                if (editingTaskId) {
+                    updateTask(editingTaskId, {
+                        title: title.trim(), 
+                        value: parseInt(val), 
+                        exp: parseInt(expVal), 
+                        type, 
+                        deadline, 
+                        difficulty: diff, 
+                        requiredCount: type === 'weekly' ? parseInt(weeklyCount) : 1, 
+                        isHot: !!isHot, 
+                        desc: desc ? desc.trim() : ''
+                    });
+                    setEditingTaskId(null);
+                } else {
+                    addTask(title, val, expVal, type, deadline, diff, weeklyCount, isHot, desc); 
+                }
+                resetForm();
+            };
+
+            const resetForm = () => {
+                setTitle(''); setVal(''); setExpVal(''); setDeadline(''); setIsHot(false); setWeeklyCount(1); setDesc(''); setEditingTaskId(null);
+            }
+
+            const handleEditTask = (task) => {
+                setEditingTaskId(task.id);
+                setTitle(task.title);
+                setVal(task.value);
+                setExpVal(task.exp);
+                setType(task.type);
+                setDiff(task.difficulty);
+                setDeadline(task.deadline || '');
+                setWeeklyCount(task.requiredCount || 1);
+                setIsHot(task.isHot || false);
+                setDesc(task.desc || '');
+            };
+
             const handleAddReward = () => { addReward(rTitle, rCost); setRTitle(''); setRCost(''); };
             const handleAddSpecial = () => { addDailySpecial(sTitle, sCost); setSTitle(''); setSCost(''); };
             const handleAvatarUpload = (e) => {
@@ -790,27 +821,36 @@
 
                     {tab==='tasks' && (
                         <div className="bg-black p-6 rounded border border-gray-800">
-                            <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 text-sm"><Sword size={16}/> 初始化新进程</h3>
+                            <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 text-sm"><Sword size={16}/> {editingTaskId ? '编辑进程' : '初始化新进程'}</h3>
                             <div className="flex flex-col gap-3 mb-8">
                                 <div className="flex flex-col md:flex-row gap-3"><input placeholder="名称" className="flex-1 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm focus:border-brand-500 outline-none" value={title} onChange={e=>setTitle(e.target.value)} /><input type="number" placeholder="算力" className="w-full md:w-20 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={val} onChange={e=>setVal(e.target.value)} /><input type="number" placeholder="经验" className="w-full md:w-20 p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={expVal} onChange={e=>setExpVal(e.target.value)} /></div>
+                                
+                                {/* New Description Input */}
+                                <input placeholder="任务描述/备注 (可选)" className="w-full p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm focus:border-brand-500 outline-none" value={desc} onChange={e=>setDesc(e.target.value)} />
+
                                 <div className="flex flex-col md:flex-row gap-3"><select className="w-full p-2 border border-gray-700 bg-gray-900 text-gray-300 rounded text-sm" value={type} onChange={e=>setType(e.target.value)}><option value="daily">守护进程</option><option value="weekly">定期维护</option><option value="limited">紧急补丁</option><option value="permanent">后台服务</option></select><select className="w-full p-2 border border-gray-700 bg-gray-900 text-gray-300 rounded text-sm" value={diff} onChange={e=>setDiff(e.target.value)}><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></div>
-                                <div className="flex gap-4 items-center">
-                                    <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                                        <input type="checkbox" checked={isHot} onChange={e=>setIsHot(e.target.checked)} className="rounded bg-gray-800 border-gray-600 text-brand-500 focus:ring-0"/> 
-                                        <span>设为高优 (HOT)</span>
-                                    </label>
-                                    {type === 'weekly' && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-gray-400">每周需做:</span>
-                                            <input type="number" min="1" max="7" value={weeklyCount} onChange={e=>setWeeklyCount(parseInt(e.target.value))} className="w-12 p-1 text-center bg-gray-900 border border-gray-700 rounded text-white text-sm" />
-                                            <span className="text-sm text-gray-400">次</span>
-                                        </div>
-                                    )}
+                                <div className="flex gap-4 items-center justify-between">
+                                    <div className="flex gap-4 items-center">
+                                        <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                                            <input type="checkbox" checked={isHot} onChange={e=>setIsHot(e.target.checked)} className="rounded bg-gray-800 border-gray-600 text-brand-500 focus:ring-0"/> 
+                                            <span>设为高优 (HOT)</span>
+                                        </label>
+                                        {type === 'weekly' && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm text-gray-400">每周需做:</span>
+                                                <input type="number" min="1" max="7" value={weeklyCount} onChange={e=>setWeeklyCount(parseInt(e.target.value))} className="w-12 p-1 text-center bg-gray-900 border border-gray-700 rounded text-white text-sm" />
+                                                <span className="text-sm text-gray-400">次</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {editingTaskId && <button onClick={resetForm} className="px-4 py-2 bg-gray-800 text-gray-300 text-sm font-bold rounded hover:bg-gray-700 transition-colors flex items-center gap-1"><XCircle size={14} /> 取消</button>}
+                                        <button onClick={handleAddTask} className="bg-brand-700 hover:bg-brand-600 text-white px-4 py-2 rounded text-sm font-bold transition-colors">{editingTaskId ? '更新协议' : '执行'}</button>
+                                    </div>
                                 </div>
                                 {type === 'limited' && <input type="date" className="p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={deadline} onChange={e=>setDeadline(e.target.value)} />}
-                                <button onClick={handleAddTask} className="bg-brand-700 hover:bg-brand-600 text-white px-4 py-2 rounded text-sm font-bold transition-colors w-full md:w-auto self-end">执行</button>
                             </div>
-                            <div className="space-y-1 max-h-[300px] overflow-y-auto pr-2">{tasks.map(t=><div key={t.id} className="flex justify-between items-center p-2 border-b border-gray-800 hover:bg-gray-900/50"><div className="flex items-center gap-2"><span className="text-[10px] bg-gray-800 text-gray-400 px-1 rounded uppercase w-12 text-center">{t.type.substring(0,4)}</span><span className="text-gray-300 text-sm">{t.title}</span></div><button onClick={()=>removeTask(t.id)} className="text-gray-600 hover:text-red-500"><Trash2 size={14}/></button></div>)}</div>
+                            <div className="space-y-1 max-h-[300px] overflow-y-auto pr-2">{tasks.map(t=><div key={t.id} className="flex justify-between items-center p-2 border-b border-gray-800 hover:bg-gray-900/50"><div className="flex items-center gap-2"><span className="text-[10px] bg-gray-800 text-gray-400 px-1 rounded uppercase w-12 text-center">{t.type.substring(0,4)}</span><span className="text-gray-300 text-sm">{t.title}</span></div><div className="flex gap-2"><button onClick={()=>handleEditTask(t)} className="text-gray-600 hover:text-brand-400"><Pencil size={14}/></button><button onClick={()=>removeTask(t.id)} className="text-gray-600 hover:text-red-500"><Trash2 size={14}/></button></div></div>)}</div>
                         </div>
                     )}
 
@@ -850,6 +890,7 @@
                 if (completed && activeTask) {
                     const now = new Date();
                     const endTimeStr = now.toISOString();
+                    // Calculate actual duration from timestamps
                     const startTime = new Date(focusState.startTime);
                     const actualDuration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
 
@@ -885,6 +926,8 @@
                             <div className="flex flex-col items-center">
                                 <div className="text-xs text-brand-500 font-bold mb-2 uppercase tracking-widest animate-pulse">:: 连接已建立 ::</div>
                                 <h3 className="text-xl font-bold text-white mb-8 font-mono-cn">{activeTask?.title}</h3>
+                                {/* Show description in Focus Mode */}
+                                {activeTask?.desc && <p className="text-sm text-gray-400 mb-6 max-w-lg">{activeTask.desc}</p>}
                                 <div className="text-6xl font-mono-cn font-bold text-white mb-8 tracking-tighter">{formatTimerDisplay(focusState.elapsed)}</div>
                                 <div className="flex gap-4">
                                     <button onClick={() => setFocusState(p => ({...p, isRunning: !p.isRunning}))} className="w-16 h-16 rounded-full border border-yellow-700 text-yellow-500 flex items-center justify-center hover:bg-yellow-900/20 transition-all">{focusState.isRunning ? <Pause size={24}/> : <Play size={24}/>}</button>
@@ -953,10 +996,10 @@
 
             // --- Effects ---
             useEffect(() => {
-                const DATA_VERSION = "3.19"; 
+                const DATA_VERSION = "3.25"; 
                 const savedVersion = localStorage.getItem('lc_hunt_version');
                 if (savedVersion !== DATA_VERSION) { 
-                    console.log("System updated to v3.19"); 
+                    console.log("System updated to v3.25"); 
                     localStorage.setItem('lc_hunt_version', DATA_VERSION); 
                 }
                 
@@ -1030,35 +1073,6 @@
             }, [focusState.isRunning, focusState.startTime]);
 
             // --- Handlers ---
-            // Fix 2: Explicitly construct Date objects for weekly calculation to avoid timezone issues
-            const getWeeklyTaskCount = (task, allLogs, today) => {
-                if (task.type !== 'weekly') return 0;
-                
-                const parts = today.split('-');
-                // Force noon to avoid DST/timezone midnight shifts
-                const curr = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
-                
-                const day = curr.getDay(); // 0 is Sunday
-                const daysFromMonday = day === 0 ? 6 : day - 1;
-                
-                const monday = new Date(curr);
-                monday.setDate(curr.getDate() - daysFromMonday);
-                
-                const weekDates = [];
-                for (let i = 0; i < 7; i++) {
-                    const d = new Date(monday);
-                    d.setDate(monday.getDate() + i);
-                    weekDates.push(formatDate(d));
-                }
-
-                let count = 0;
-                weekDates.forEach(date => {
-                    const logs = allLogs[date] || [];
-                    count += logs.filter(l => l.taskId === task.id).length;
-                });
-                return count;
-            };
-
             const showNotification = (message, type = 'success') => { setNotification({ message, type }); setTimeout(() => setNotification(null), 3000); };
             const today = formatDate(new Date());
 
@@ -1091,6 +1105,35 @@
 
             const isTaskCompleted = (task) => { if (task.type === 'permanent') return false; if (task.type === 'limited') return completedLimited.includes(task.id); const todayLog = activityLog[today] || []; if (task.type === 'daily') return todayLog.some(log => log.taskId === task.id); if (task.type === 'weekly') { const required = task.requiredCount || 1; const current = getWeeklyTaskCount(task, activityLog, today); return current >= required; } return false; };
             
+            // Helper to count weekly progress
+            const getWeeklyTaskCount = (task, allLogs, today) => {
+                if (task.type !== 'weekly') return 0;
+                
+                const parts = today.split('-');
+                // Force noon to avoid DST/timezone midnight shifts
+                const curr = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+                
+                const day = curr.getDay(); // 0 is Sunday
+                const daysFromMonday = day === 0 ? 6 : day - 1;
+                
+                const monday = new Date(curr);
+                monday.setDate(curr.getDate() - daysFromMonday);
+                
+                const weekDates = [];
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate() + i);
+                    weekDates.push(formatDate(d));
+                }
+
+                let count = 0;
+                weekDates.forEach(date => {
+                    const logs = allLogs[date] || [];
+                    count += logs.filter(l => l.taskId === task.id).length;
+                });
+                return count;
+            };
+
             const handleTaskClick = (task) => { 
                 const completed = isTaskCompleted(task);
                 const timeStatus = getTaskTimeStatus(task, currentTime);
@@ -1156,19 +1199,29 @@
             const useInventoryItem = (itemId) => { setInventory(prev => prev.map(item => { if (item.id === itemId) return { ...item, used: true, usedAt: new Date().toISOString() }; return item; })); showNotification("物品已消耗。", "success"); };
             const deleteInventoryItem = (itemId) => { if(confirm('确认删除日志？')) { setInventory(prev => prev.filter(item => item.id !== itemId)); } };
             const resetAllData = () => { if (window.confirm("⚠️ 系统格式化警告：所有数据将丢失。")) { localStorage.clear(); window.location.reload(); } };
-            const exportData = () => { const data = { tasks, rewards, balance, xp, activityLog, completedLimited, inventory, focusState, checkInState, unlockedAchievements, dailySpecials, avatar, dailyNotes, lastBackup: now, version: "3.19" }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Matrix_v3.19_Backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showNotification("备份已生成。"); };
+            const exportData = () => { const data = { tasks, rewards, balance, xp, activityLog, completedLimited, inventory, focusState, checkInState, unlockedAchievements, dailySpecials, avatar, dailyNotes, lastBackup: now, version: "3.23" }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Matrix_v3.23_Backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showNotification("备份已生成。"); };
             const importData = (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if (confirm("覆盖当前系统数据？")) { setTasks(data.tasks || DEFAULT_TASKS); setRewards(data.rewards || DEFAULT_REWARDS); setBalance(data.balance || 0); setXP(data.xp || 0); setActivityLog(data.activityLog || {}); setCompletedLimited(data.completedLimited || []); setInventory(data.inventory || []); setCheckInState(data.checkInState || { lastCheckIn: '', streak: 0 }); setUnlockedAchievements(data.unlockedAchievements || []); setDailySpecials(data.dailySpecials || DEFAULT_DAILY_SPECIALS); setAvatar(data.avatar || ''); setDailyNotes(data.dailyNotes || {}); setLastBackup(data.lastBackup || '无记录'); showNotification("系统已恢复。", "success"); } } catch (error) { showNotification("文件损坏。", "error"); } }; reader.readAsText(file); event.target.value = null; };
-            const addTask = (title, value, expVal, type, deadline, difficulty, weeklyCount, isHot) => { 
+            
+            // Updated addTask to include desc and isHot
+            const addTask = (title, value, expVal, type, deadline, difficulty, weeklyCount, isHot, desc) => { 
                 if (!title.trim()) return; 
                 const newTask = { 
                     id: Date.now(), title: title.trim(), value: parseInt(value), exp: parseInt(expVal), 
                     type, deadline, difficulty, 
                     requiredCount: type === 'weekly' ? parseInt(weeklyCount) : 1,
-                    isHot: !!isHot
+                    isHot: !!isHot,
+                    desc: desc ? desc.trim() : '' // Save description
                 }; 
                 setTasks([...tasks, newTask]); 
                 showNotification("协议已注册。", "success"); 
             };
+
+            // Added updateTask function
+            const updateTask = (id, updatedFields) => {
+                setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updatedFields } : t));
+                showNotification("协议已更新。", "success");
+            };
+
             const removeTask = (id) => setTasks(tasks.filter(t => t.id !== id));
             const addReward = (title, cost) => { if (!title.trim()) return; setRewards([...rewards, { id: Date.now(), title: title.trim(), cost: parseInt(cost) }]); showNotification("软件包已上架。", "success"); };
             const removeReward = (id) => setRewards(rewards.filter(r => r.id !== id));
@@ -1182,7 +1235,7 @@
                     {showLotteryModal && <LotteryModal rewards={rewards} onClaim={handleClaimLottery} onClose={() => setShowLotteryModal(false)} />}
 
                     <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 flex flex-col transform transition-transform duration-300 md:translate-x-0 ${'translate-x-0 hidden md:flex'}`}>
-                        <div className="p-6 flex items-center gap-3 border-b border-gray-800"><div className="text-brand-500"><Terminal size={24} /></div><div><h1 className="text-lg font-bold leading-none text-white tracking-wider">MATRIX</h1><span className="text-xs text-gray-500">v3.19.0 Fix</span></div></div>
+                        <div className="p-6 flex items-center gap-3 border-b border-gray-800"><div className="text-brand-500"><Terminal size={24} /></div><div><h1 className="text-lg font-bold leading-none text-white tracking-wider">MATRIX</h1><span className="text-xs text-gray-500">v3.23.0 FinalFix</span></div></div>
                         <SidebarProfile xp={xp} avatar={avatar} onClick={() => setShowAchievementsModal(true)} />
                         <nav className="flex-1 p-4 space-y-2">
                             {[{id: 'dashboard', icon: LayoutDashboard, label: '情报总览'}, {id: 'tasks', icon: Sword, label: '执行协议'}, {id: 'focus', icon: Timer, label: '深潜模式'}, {id: 'journal', icon: BookOpen, label: '系统日志'}, {id: 'store', icon: ShoppingBag, label: '补给站'}, {id: 'inventory', icon: Backpack, label: '存储空间'}, {id: 'settings', icon: Settings, label: '系统设置'}].map(item => (
@@ -1205,7 +1258,7 @@
                             {activeTab === 'journal' && <JournalView dailyNotes={dailyNotes} setDailyNotes={setDailyNotes} showNotification={showNotification} activityLog={activityLog} tasks={tasks} />}
                             {activeTab === 'store' && <StoreView balance={balance} rewards={rewards} redeemReward={redeemReward} setActiveTab={setActiveTab} dailySpecials={dailySpecials} onRedeemSpecial={onRedeemSpecial} />}
                             {activeTab === 'inventory' && <InventoryView inventory={inventory} useInventoryItem={useInventoryItem} deleteInventoryItem={deleteInventoryItem} unlockedAchievements={unlockedAchievements} />}
-                            {activeTab === 'settings' && <SettingsView tasks={tasks} rewards={rewards} addTask={addTask} removeTask={removeTask} addReward={addReward} removeReward={removeReward} exportData={exportData} importData={importData} resetAllData={resetAllData} fileInputRef={fileInputRef} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} dailySpecials={dailySpecials} addDailySpecial={addDailySpecial} removeDailySpecial={removeDailySpecial} avatar={avatar} setAvatar={setAvatar} lastBackup={lastBackup} />}
+                            {activeTab === 'settings' && <SettingsView tasks={tasks} rewards={rewards} addTask={addTask} updateTask={updateTask} removeTask={removeTask} addReward={addReward} removeReward={removeReward} exportData={exportData} importData={importData} resetAllData={resetAllData} fileInputRef={fileInputRef} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} dailySpecials={dailySpecials} addDailySpecial={addDailySpecial} removeDailySpecial={removeDailySpecial} avatar={avatar} setAvatar={setAvatar} lastBackup={lastBackup} />}
                         </div>
                     </main>
                     {notification && (
