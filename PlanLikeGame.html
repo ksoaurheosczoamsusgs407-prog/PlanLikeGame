@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>任务协理终端 v3.25 (EditFix)</title>
+    <title>任务协理终端 v3.3 (MustDo Edition)</title>
     
     <!-- 1. 加载 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,12 +25,23 @@
                     animation: {
                         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                         'blink': 'blink 1s step-end infinite',
+                        'gradient-x': 'gradient-x 3s ease infinite',
                     },
                     keyframes: {
                         blink: {
                             '0%, 100%': { opacity: 1 },
                             '50%': { opacity: 0 },
-                        }
+                        },
+                        'gradient-x': {
+                            '0%, 100%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'left center'
+                            },
+                            '50%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'right center'
+                            },
+                        },
                     }
                 }
             }
@@ -51,7 +62,7 @@
     }
     </script>
 
-    <!-- 3. 加载 Babel (锁定版本以修复兼容性问题) -->
+    <!-- 3. 加载 Babel -->
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
 
     <style>
@@ -64,6 +75,36 @@
         .mobile-nav-btn:active { background-color: rgba(34, 197, 94, 0.1); }
         
         @media (max-width: 375px) { .focus-timer-text { font-size: 3rem !important; } }
+
+        /* RGB 流光特效 */
+        .must-do-glow {
+            position: relative;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid transparent;
+            background-clip: padding-box;
+            z-index: 1;
+        }
+
+        .must-do-glow::before {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            z-index: -1;
+            border-radius: inherit;
+            background: linear-gradient(
+                45deg, 
+                #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000
+            );
+            background-size: 400%;
+            animation: glowing 8s linear infinite;
+            opacity: 0.8;
+        }
+
+        @keyframes glowing {
+            0% { background-position: 0 0; }
+            50% { background-position: 200% 0; }
+            100% { background-position: 400% 0; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-black transition-colors duration-300 text-gray-800 dark:text-gray-300 font-mono">
@@ -81,25 +122,20 @@
             Timer, Play, Pause, Square, ChevronRight, Upload, Download, User, BarChart3, Volume2, VolumeX, X,
             Medal, Target, Award, Sparkles, Crosshair, Crown, Cpu, Terminal, ShieldCheck, Box, Lock, TimerReset,
             ShoppingCart, Moon as MoonIcon, Code, Database, Server, Power, Camera, Image as ImageIcon, Circle, CheckCircle2,
-            FileText, Save, BookOpen, BarChart2, HardDrive, RefreshCw, AlertTriangle, Info, Pencil, XCircle
+            FileText, Save, BookOpen, BarChart2, HardDrive, RefreshCw, AlertTriangle, Info, Pencil, XCircle,
+            ArrowUp, ArrowDown, Siren
         } from 'lucide-react';
         import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
         // --- 默认数据 ---
         const DEFAULT_TASKS = [
-            { id: 1, title: '机体散热 (运动30m)', desc: '跑步机或帕梅拉，保持心率120以上', value: 40, exp: 50, type: 'daily', difficulty: 'medium', isHot: true },
+            { id: 1, title: '机体散热 (运动30m)', desc: '跑步机或帕梅拉，保持心率120以上', value: 40, exp: 50, type: 'daily', difficulty: 'medium', isHot: true, isMustDo: true },
             { id: 2, title: '广播协议 (投简历50家)', desc: 'Boss直聘/拉勾，针对性投递，记录HR反馈', value: 80, exp: 100, type: 'daily', difficulty: 'hard', isHot: true },
             { id: 3, title: '代码同步 (Gitee Push)', desc: '提交今日代码变更，保持绿色格子', value: 15, exp: 20, type: 'daily', difficulty: 'easy' },
             { id: 4, title: '情报获取 (CSDN/知乎)', desc: '关注AI前沿、Vue/React新特性、行业动态', value: 20, exp: 20, type: 'daily', difficulty: 'easy' },
             { id: 10, title: '脚本解析 (Python 1.5h)', desc: '爬虫或数据分析模块，系统化学习', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
             { id: 11, title: '版本控制 (Git 1.5h)', desc: '熟悉 Rebase, Merge, Cherry-pick 等命令', value: 100, exp: 120, type: 'permanent', difficulty: 'medium' },
-            { id: 12, title: '虚拟构建 (Unity 1.5h)', desc: 'C# 脚本编写，场景搭建练习', value: 110, exp: 150, type: 'permanent', difficulty: 'medium' },
-            { id: 13, title: '数据库索引 (MySQL)', desc: '复习索引原理、事务隔离级别、锁机制', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
-            { id: 14, title: 'C++ 编译 (二级学习)', desc: '指针、内存管理、STL 库复习', value: 35, exp: 40, type: 'permanent', difficulty: 'medium' },
             { id: 20, title: '防火墙攻坚 (力扣2h)', desc: '至少解决2道中等题或1道困难题', value: 200, exp: 300, type: 'limited', difficulty: 'hard', isHot: true },
-            { id: 21, title: '内核编译 (算法+博客)', desc: '输出今日算法题解，发布到博客', value: 220, exp: 350, type: 'limited', difficulty: 'hard', isHot: true },
-            { id: 30, title: '底层重构 (C++复习)', desc: '深度复习，整理笔记，查漏补缺', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 3 },
-            { id: 31, title: '协议分析 (Linux复习)', desc: '系统编程、网络编程、常用指令', value: 300, exp: 500, type: 'weekly', difficulty: 'hard', requiredCount: 2 },
         ];
 
         const DEFAULT_REWARDS = [
@@ -451,6 +487,9 @@
             const diffConfig = { easy: { color: 'text-green-500', label: '简单', mul: 1 }, medium: { color: 'text-yellow-500', label: '中等', mul: 1 }, hard: { color: 'text-red-500', label: '硬核', mul: 1 } };
             const diff = diffConfig[task.difficulty || 'medium']; 
 
+            // 判断是否必做任务
+            const isMustDo = task.isMustDo && !isCompleted;
+
             const borderClass = isCompleted ? `border-gray-800 opacity-50` : `border-gray-700 hover:border-brand-500`;
             const bgClass = isCompleted ? `bg-gray-900` : `bg-gray-900`;
 
@@ -459,18 +498,25 @@
             const isWeeklyIncomplete = task.type === 'weekly' && currentCount < requiredCount;
 
             return (
-                <div onClick={onClick} className={`relative p-4 rounded border transition-all cursor-pointer select-none group overflow-hidden ${bgClass} ${borderClass}`}>
-                    {/* HOT 标识 */}
-                    {task.isHot && !isCompleted && !isWeeklyIncomplete && (
+                <div onClick={onClick} className={`relative p-4 rounded border transition-all cursor-pointer select-none group overflow-hidden ${bgClass} ${isMustDo ? 'must-do-glow border-transparent' : borderClass}`}>
+                    {/* MUST DO 标识 */}
+                    {isMustDo && (
+                        <div className="absolute top-0 right-0 bg-gradient-to-r from-red-600 to-purple-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm z-20 flex items-center gap-1">
+                            <Siren size={10} className="animate-pulse" /> MUST DO
+                        </div>
+                    )}
+                    
+                    {/* HOT 标识 (如果不是Must Do才显示Hot, 避免重叠拥挤) */}
+                    {task.isHot && !isCompleted && !isWeeklyIncomplete && !isMustDo && (
                         <div className="absolute top-0 right-0 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-bl shadow-sm animate-pulse z-20">HOT</div>
                     )}
 
-                    <div className="flex items-center gap-3 w-full">
-                         <div className={`w-8 h-8 rounded flex items-center justify-center transition-colors flex-shrink-0 border ${isCompleted ? 'border-brand-900 text-brand-900 bg-black' : 'border-gray-700 text-gray-500 bg-gray-800 group-hover:text-brand-400 group-hover:border-brand-500'}`}>
+                    <div className="flex items-center gap-3 w-full relative z-10">
+                         <div className={`w-8 h-8 rounded flex items-center justify-center transition-colors flex-shrink-0 border ${isCompleted ? 'border-brand-900 text-brand-900 bg-black' : (isMustDo ? 'border-white/50 text-white bg-white/10' : 'border-gray-700 text-gray-500 bg-gray-800 group-hover:text-brand-400 group-hover:border-brand-500')}`}>
                             {task.type === 'permanent' ? <IconComp size={16} /> : <CheckCircle size={16} />}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className={`font-bold text-sm truncate font-mono-cn ${isCompleted ? 'text-gray-600 line-through' : 'text-gray-300 group-hover:text-brand-100'}`}>{task.title}</div>
+                            <div className={`font-bold text-sm truncate font-mono-cn ${isCompleted ? 'text-gray-600 line-through' : (isMustDo ? 'text-white' : 'text-gray-300 group-hover:text-brand-100')}`}>{task.title}</div>
                             {/* 新增：任务描述 */}
                             {task.desc && <div className={`text-[10px] truncate mt-0.5 font-sans ${isCompleted ? 'text-gray-600' : 'text-gray-500'}`}>{task.desc}</div>}
                             
@@ -491,7 +537,7 @@
                             )}
                         </div>
                         <div className="text-right">
-                             <div className={`text-sm font-bold font-mono-cn ${isCompleted ? 'text-gray-700' : 'text-brand-500'}`}>+{task.value}</div>
+                             <div className={`text-sm font-bold font-mono-cn ${isCompleted ? 'text-gray-700' : (isMustDo ? 'text-white text-shadow' : 'text-brand-500')}`}>+{task.value}</div>
                              <div className="text-[10px] text-gray-600">算力</div>
                         </div>
                     </div>
@@ -518,15 +564,15 @@
 
             return (
                 <div className="rounded border border-pink-900/50 bg-pink-900/10 p-4 relative overflow-hidden flex flex-col justify-between h-full group hover:border-pink-500/50 transition-colors">
-                     <div className="absolute top-0 right-0 p-2 opacity-20 text-pink-500"><Sparkles size={40} /></div>
-                     <div className="relative z-10">
+                      <div className="absolute top-0 right-0 p-2 opacity-20 text-pink-500"><Sparkles size={40} /></div>
+                      <div className="relative z-10">
                         <div className="flex items-center gap-2 mb-2"><TimerReset size={14} className="text-pink-400"/><span className="text-[10px] font-bold text-pink-500 uppercase tracking-widest">每日特惠</span></div>
                         <h3 className="text-sm font-bold text-pink-100 mb-1">{dailySpecial.title || "未知物品"}</h3>
                         <div className="text-[10px] text-pink-400/80 font-mono-cn">限购 1 次</div>
-                     </div>
-                     <button onClick={() => onRedeem(dailySpecial)} disabled={isSoldOut || !canAfford} className={`relative z-10 mt-3 w-full py-1.5 rounded border text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${isSoldOut ? 'border-gray-800 text-gray-600 cursor-not-allowed bg-black' : canAfford ? 'border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-black' : 'border-gray-800 text-gray-700 cursor-not-allowed'}`}>
+                      </div>
+                      <button onClick={() => onRedeem(dailySpecial)} disabled={isSoldOut || !canAfford} className={`relative z-10 mt-3 w-full py-1.5 rounded border text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${isSoldOut ? 'border-gray-800 text-gray-600 cursor-not-allowed bg-black' : canAfford ? 'border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-black' : 'border-gray-800 text-gray-700 cursor-not-allowed'}`}>
                         {isSoldOut ? '已售罄' : <>{!canAfford && <AlertCircle size={10}/>} -{dailySpecial.cost} 抢购</>}
-                     </button>
+                      </button>
                 </div>
             );
         };
@@ -679,13 +725,14 @@
             );
         };
 
-        const SettingsView = ({ tasks, rewards, addTask, updateTask, removeTask, addReward, removeReward, exportData, importData, resetAllData, fileInputRef, jumpTo, soundEnabled, setSoundEnabled, dailySpecials, addDailySpecial, removeDailySpecial, avatar, setAvatar, lastBackup }) => {
+        const SettingsView = ({ tasks, rewards, addTask, updateTask, removeTask, moveTask, addReward, removeReward, exportData, importData, resetAllData, fileInputRef, jumpTo, soundEnabled, setSoundEnabled, dailySpecials, addDailySpecial, removeDailySpecial, avatar, setAvatar, lastBackup }) => {
             const [tab, setTab] = useState('tasks');
             useEffect(() => { if(jumpTo) setTab(jumpTo); }, [jumpTo]);
             const [title, setTitle] = useState(''); const [val, setVal] = useState(''); const [expVal, setExpVal] = useState(''); const [type, setType] = useState('daily'); const [diff, setDiff] = useState('medium'); const [deadline, setDeadline] = useState('');
             const [desc, setDesc] = useState('');
             const [weeklyCount, setWeeklyCount] = useState(1);
             const [isHot, setIsHot] = useState(false);
+            const [isMustDo, setIsMustDo] = useState(false); // 新增 MustDo 状态
             const [rTitle, setRTitle] = useState(''); const [rCost, setRCost] = useState('');
             const [sTitle, setSTitle] = useState(''); const [sCost, setSCost] = useState('');
             const [avatarUrl, setAvatarUrl] = useState('');
@@ -702,17 +749,18 @@
                         difficulty: diff, 
                         requiredCount: type === 'weekly' ? parseInt(weeklyCount) : 1, 
                         isHot: !!isHot, 
+                        isMustDo: !!isMustDo,
                         desc: desc ? desc.trim() : ''
                     });
                     setEditingTaskId(null);
                 } else {
-                    addTask(title, val, expVal, type, deadline, diff, weeklyCount, isHot, desc); 
+                    addTask(title, val, expVal, type, deadline, diff, weeklyCount, isHot, isMustDo, desc); 
                 }
                 resetForm();
             };
 
             const resetForm = () => {
-                setTitle(''); setVal(''); setExpVal(''); setDeadline(''); setIsHot(false); setWeeklyCount(1); setDesc(''); setEditingTaskId(null);
+                setTitle(''); setVal(''); setExpVal(''); setDeadline(''); setIsHot(false); setIsMustDo(false); setWeeklyCount(1); setDesc(''); setEditingTaskId(null);
             }
 
             const handleEditTask = (task) => {
@@ -725,6 +773,7 @@
                 setDeadline(task.deadline || '');
                 setWeeklyCount(task.requiredCount || 1);
                 setIsHot(task.isHot || false);
+                setIsMustDo(task.isMustDo || false);
                 setDesc(task.desc || '');
             };
 
@@ -829,11 +878,15 @@
                                 <input placeholder="任务描述/备注 (可选)" className="w-full p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm focus:border-brand-500 outline-none" value={desc} onChange={e=>setDesc(e.target.value)} />
 
                                 <div className="flex flex-col md:flex-row gap-3"><select className="w-full p-2 border border-gray-700 bg-gray-900 text-gray-300 rounded text-sm" value={type} onChange={e=>setType(e.target.value)}><option value="daily">守护进程</option><option value="weekly">定期维护</option><option value="limited">紧急补丁</option><option value="permanent">后台服务</option></select><select className="w-full p-2 border border-gray-700 bg-gray-900 text-gray-300 rounded text-sm" value={diff} onChange={e=>setDiff(e.target.value)}><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></div>
-                                <div className="flex gap-4 items-center justify-between">
+                                <div className="flex gap-4 items-center justify-between flex-wrap">
                                     <div className="flex gap-4 items-center">
                                         <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
                                             <input type="checkbox" checked={isHot} onChange={e=>setIsHot(e.target.checked)} className="rounded bg-gray-800 border-gray-600 text-brand-500 focus:ring-0"/> 
                                             <span>设为高优 (HOT)</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                                            <input type="checkbox" checked={isMustDo} onChange={e=>setIsMustDo(e.target.checked)} className="rounded bg-gray-800 border-gray-600 text-red-500 focus:ring-0"/> 
+                                            <span className={isMustDo ? "text-red-400 font-bold" : ""}>每日必做 (MUST DO)</span>
                                         </label>
                                         {type === 'weekly' && (
                                             <div className="flex items-center gap-2">
@@ -850,7 +903,29 @@
                                 </div>
                                 {type === 'limited' && <input type="date" className="p-2 border border-gray-700 bg-gray-900 text-white rounded text-sm" value={deadline} onChange={e=>setDeadline(e.target.value)} />}
                             </div>
-                            <div className="space-y-1 max-h-[300px] overflow-y-auto pr-2">{tasks.map(t=><div key={t.id} className="flex justify-between items-center p-2 border-b border-gray-800 hover:bg-gray-900/50"><div className="flex items-center gap-2"><span className="text-[10px] bg-gray-800 text-gray-400 px-1 rounded uppercase w-12 text-center">{t.type.substring(0,4)}</span><span className="text-gray-300 text-sm">{t.title}</span></div><div className="flex gap-2"><button onClick={()=>handleEditTask(t)} className="text-gray-600 hover:text-brand-400"><Pencil size={14}/></button><button onClick={()=>removeTask(t.id)} className="text-gray-600 hover:text-red-500"><Trash2 size={14}/></button></div></div>)}</div>
+                            
+                            <div className="text-xs text-gray-500 mb-2 flex justify-between">
+                                <span>任务列表 (使用上下箭头调整顺序)</span>
+                            </div>
+                            <div className="space-y-1 max-h-[300px] overflow-y-auto pr-2">
+                                {tasks.map((t, index) => (
+                                    <div key={t.id} className="flex justify-between items-center p-2 border-b border-gray-800 hover:bg-gray-900/50">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex flex-col gap-0.5 mr-1">
+                                                <button onClick={() => moveTask(index, -1)} disabled={index === 0} className="text-gray-600 hover:text-brand-400 disabled:opacity-20"><ArrowUp size={12} /></button>
+                                                <button onClick={() => moveTask(index, 1)} disabled={index === tasks.length - 1} className="text-gray-600 hover:text-brand-400 disabled:opacity-20"><ArrowDown size={12} /></button>
+                                            </div>
+                                            <span className={`text-[10px] px-1 rounded uppercase w-12 text-center ${t.isMustDo ? 'bg-red-900 text-red-200' : 'bg-gray-800 text-gray-400'}`}>{t.type.substring(0,4)}</span>
+                                            <span className={`text-sm ${t.isMustDo ? 'text-white font-bold' : 'text-gray-300'}`}>{t.title}</span>
+                                            {t.isMustDo && <Siren size={12} className="text-red-500" />}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={()=>handleEditTask(t)} className="text-gray-600 hover:text-brand-400"><Pencil size={14}/></button>
+                                            <button onClick={()=>removeTask(t.id)} className="text-gray-600 hover:text-red-500"><Trash2 size={14}/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
 
@@ -1003,7 +1078,6 @@
                     localStorage.setItem('lc_hunt_version', DATA_VERSION); 
                 }
                 
-                // 修复历史数据：根据 startTime 和 endTime 重新计算 duration
                 setActivityLog(prev => {
                     const nextLog = { ...prev };
                     let hasFixes = false;
@@ -1013,7 +1087,6 @@
                                 const start = new Date(log.startTime).getTime();
                                 const end = new Date(log.endTime).getTime();
                                 const realDuration = Math.floor((end - start) / 1000);
-                                // 如果误差超过2秒，则修正
                                 if (realDuration > 0 && Math.abs(log.duration - realDuration) > 2) {
                                     hasFixes = true;
                                     return { ...log, duration: realDuration };
@@ -1057,7 +1130,6 @@
             useEffect(() => { if (darkMode) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); }, [darkMode]);
             useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 60000); return () => clearInterval(timer); }, []);
             
-            // 修复：每次重新计算时间差，而不是简单累加
             useEffect(() => { 
                 if (focusState.isRunning && focusState.startTime) { 
                     timerRef.current = setInterval(() => { 
@@ -1105,27 +1177,20 @@
 
             const isTaskCompleted = (task) => { if (task.type === 'permanent') return false; if (task.type === 'limited') return completedLimited.includes(task.id); const todayLog = activityLog[today] || []; if (task.type === 'daily') return todayLog.some(log => log.taskId === task.id); if (task.type === 'weekly') { const required = task.requiredCount || 1; const current = getWeeklyTaskCount(task, activityLog, today); return current >= required; } return false; };
             
-            // Helper to count weekly progress
             const getWeeklyTaskCount = (task, allLogs, today) => {
                 if (task.type !== 'weekly') return 0;
-                
                 const parts = today.split('-');
-                // Force noon to avoid DST/timezone midnight shifts
                 const curr = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
-                
-                const day = curr.getDay(); // 0 is Sunday
+                const day = curr.getDay(); 
                 const daysFromMonday = day === 0 ? 6 : day - 1;
-                
                 const monday = new Date(curr);
                 monday.setDate(curr.getDate() - daysFromMonday);
-                
                 const weekDates = [];
                 for (let i = 0; i < 7; i++) {
                     const d = new Date(monday);
                     d.setDate(monday.getDate() + i);
                     weekDates.push(formatDate(d));
                 }
-
                 let count = 0;
                 weekDates.forEach(date => {
                     const logs = allLogs[date] || [];
@@ -1156,11 +1221,8 @@
                     const required = task.requiredCount || 1;
                     const current = getWeeklyTaskCount(task, activityLog, today);
                     if (current < required) {
-                         // Fix 1: Determine if this is the final step
                          const isFinalStep = (current + 1 === required);
-                         // If final step, log the full reward value, otherwise 0
                          const logValue = isFinalStep ? task.value : 0;
-                         
                          const newLogEntry = { taskId: task.id, type: task.type, value: logValue, timestamp: Date.now(), duration: 0 }; 
                          const newLogsForToday = [...(activityLog[today] || []), newLogEntry];
                          const newActivityLog = { ...activityLog, [today]: newLogsForToday };
@@ -1202,15 +1264,16 @@
             const exportData = () => { const data = { tasks, rewards, balance, xp, activityLog, completedLimited, inventory, focusState, checkInState, unlockedAchievements, dailySpecials, avatar, dailyNotes, lastBackup: now, version: "3.23" }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Matrix_v3.23_Backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showNotification("备份已生成。"); };
             const importData = (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if (confirm("覆盖当前系统数据？")) { setTasks(data.tasks || DEFAULT_TASKS); setRewards(data.rewards || DEFAULT_REWARDS); setBalance(data.balance || 0); setXP(data.xp || 0); setActivityLog(data.activityLog || {}); setCompletedLimited(data.completedLimited || []); setInventory(data.inventory || []); setCheckInState(data.checkInState || { lastCheckIn: '', streak: 0 }); setUnlockedAchievements(data.unlockedAchievements || []); setDailySpecials(data.dailySpecials || DEFAULT_DAILY_SPECIALS); setAvatar(data.avatar || ''); setDailyNotes(data.dailyNotes || {}); setLastBackup(data.lastBackup || '无记录'); showNotification("系统已恢复。", "success"); } } catch (error) { showNotification("文件损坏。", "error"); } }; reader.readAsText(file); event.target.value = null; };
             
-            // Updated addTask to include desc and isHot
-            const addTask = (title, value, expVal, type, deadline, difficulty, weeklyCount, isHot, desc) => { 
+            // Updated addTask to include desc, isHot, and isMustDo
+            const addTask = (title, value, expVal, type, deadline, difficulty, weeklyCount, isHot, isMustDo, desc) => { 
                 if (!title.trim()) return; 
                 const newTask = { 
                     id: Date.now(), title: title.trim(), value: parseInt(value), exp: parseInt(expVal), 
                     type, deadline, difficulty, 
                     requiredCount: type === 'weekly' ? parseInt(weeklyCount) : 1,
                     isHot: !!isHot,
-                    desc: desc ? desc.trim() : '' // Save description
+                    isMustDo: !!isMustDo,
+                    desc: desc ? desc.trim() : ''
                 }; 
                 setTasks([...tasks, newTask]); 
                 showNotification("协议已注册。", "success"); 
@@ -1223,6 +1286,17 @@
             };
 
             const removeTask = (id) => setTasks(tasks.filter(t => t.id !== id));
+
+            // Move Task Function for Custom Sorting
+            const moveTask = (index, direction) => {
+                if (index + direction < 0 || index + direction >= tasks.length) return;
+                const newTasks = [...tasks];
+                const temp = newTasks[index];
+                newTasks[index] = newTasks[index + direction];
+                newTasks[index + direction] = temp;
+                setTasks(newTasks);
+            };
+
             const addReward = (title, cost) => { if (!title.trim()) return; setRewards([...rewards, { id: Date.now(), title: title.trim(), cost: parseInt(cost) }]); showNotification("软件包已上架。", "success"); };
             const removeReward = (id) => setRewards(rewards.filter(r => r.id !== id));
             const stats = useMemo(() => { let currentStreak = 0; let checkDate = new Date(); checkDate.setHours(0,0,0,0); const todayStr = formatDate(checkDate); if (!activityLog[todayStr] || activityLog[todayStr].length === 0) checkDate.setDate(checkDate.getDate() - 1); while (true) { const dateStr = formatDate(checkDate); if (activityLog[dateStr] && activityLog[dateStr].length > 0) { currentStreak++; checkDate.setDate(checkDate.getDate() - 1); } else { break; } } const todayCount = (activityLog[today] || []).length; return { streak: currentStreak, todayCount }; }, [activityLog, today]);
@@ -1235,7 +1309,7 @@
                     {showLotteryModal && <LotteryModal rewards={rewards} onClaim={handleClaimLottery} onClose={() => setShowLotteryModal(false)} />}
 
                     <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 flex flex-col transform transition-transform duration-300 md:translate-x-0 ${'translate-x-0 hidden md:flex'}`}>
-                        <div className="p-6 flex items-center gap-3 border-b border-gray-800"><div className="text-brand-500"><Terminal size={24} /></div><div><h1 className="text-lg font-bold leading-none text-white tracking-wider">MATRIX</h1><span className="text-xs text-gray-500">v3.23.0 FinalFix</span></div></div>
+                        <div className="p-6 flex items-center gap-3 border-b border-gray-800"><div className="text-brand-500"><Terminal size={24} /></div><div><h1 className="text-lg font-bold leading-none text-white tracking-wider">MATRIX</h1><span className="text-xs text-gray-500">v3.3.0 MustDo</span></div></div>
                         <SidebarProfile xp={xp} avatar={avatar} onClick={() => setShowAchievementsModal(true)} />
                         <nav className="flex-1 p-4 space-y-2">
                             {[{id: 'dashboard', icon: LayoutDashboard, label: '情报总览'}, {id: 'tasks', icon: Sword, label: '执行协议'}, {id: 'focus', icon: Timer, label: '深潜模式'}, {id: 'journal', icon: BookOpen, label: '系统日志'}, {id: 'store', icon: ShoppingBag, label: '补给站'}, {id: 'inventory', icon: Backpack, label: '存储空间'}, {id: 'settings', icon: Settings, label: '系统设置'}].map(item => (
@@ -1258,7 +1332,7 @@
                             {activeTab === 'journal' && <JournalView dailyNotes={dailyNotes} setDailyNotes={setDailyNotes} showNotification={showNotification} activityLog={activityLog} tasks={tasks} />}
                             {activeTab === 'store' && <StoreView balance={balance} rewards={rewards} redeemReward={redeemReward} setActiveTab={setActiveTab} dailySpecials={dailySpecials} onRedeemSpecial={onRedeemSpecial} />}
                             {activeTab === 'inventory' && <InventoryView inventory={inventory} useInventoryItem={useInventoryItem} deleteInventoryItem={deleteInventoryItem} unlockedAchievements={unlockedAchievements} />}
-                            {activeTab === 'settings' && <SettingsView tasks={tasks} rewards={rewards} addTask={addTask} updateTask={updateTask} removeTask={removeTask} addReward={addReward} removeReward={removeReward} exportData={exportData} importData={importData} resetAllData={resetAllData} fileInputRef={fileInputRef} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} dailySpecials={dailySpecials} addDailySpecial={addDailySpecial} removeDailySpecial={removeDailySpecial} avatar={avatar} setAvatar={setAvatar} lastBackup={lastBackup} />}
+                            {activeTab === 'settings' && <SettingsView tasks={tasks} rewards={rewards} addTask={addTask} updateTask={updateTask} removeTask={removeTask} moveTask={moveTask} addReward={addReward} removeReward={removeReward} exportData={exportData} importData={importData} resetAllData={resetAllData} fileInputRef={fileInputRef} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} dailySpecials={dailySpecials} addDailySpecial={addDailySpecial} removeDailySpecial={removeDailySpecial} avatar={avatar} setAvatar={setAvatar} lastBackup={lastBackup} />}
                         </div>
                     </main>
                     {notification && (
